@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>C-Store Daily Sales Tracker</title>
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<!-- SheetJS -->
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<!-- Supabase JS v2 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:0.75rem; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -1px rgba(0,0,0,0.04); }
+  .section-title { background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:#fff; padding:0.5rem 1rem; border-radius:0.375rem 0.375rem 0 0; font-weight:600; letter-spacing:0.02em; }
+  input[type="text"], input[type="number"], input[type="date"], textarea, select {
+    border:1px solid #cbd5e1; border-radius:0.5rem; padding:0.5rem 0.75rem; width:100%; font-variant-numeric: tabular-nums;
+  }
+  input:focus, textarea:focus, select:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.15); }
+  .toast { position:fixed; top:1rem; right:1rem; z-index:50; }
+
+  /* ---- Daily Report Form (POS style) ---- */
+  .field-label { display:block; font-size:0.7rem; font-weight:700; letter-spacing:0.04em; color:#64748b; text-transform:uppercase; margin-bottom:0.35rem; }
+  .field-wrap { position:relative; }
+  .field-wrap .dollar-prefix { position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); color:#94a3b8; pointer-events:none; }
+  .field-wrap input.field-input { padding-left:1.75rem !important; }
+  input.field-input { border:1px solid #cbd5e1; border-radius:0.5rem; padding:0.55rem 0.7rem; width:100%; }
+  input.field-readonly { background:#f1f5f9 !important; font-weight:700; color:#1e293b; }
+  .pos-section-header { font-size:0.78rem; font-weight:700; letter-spacing:0.05em; color:#1e293b; text-transform:uppercase; padding-bottom:0.35rem; border-bottom:1px solid #e2e8f0; margin-bottom:0.65rem; }
+  .pos-section-header .num { color:#64748b; margin-right:0.4rem; }
+  .grand-total-bar { background:#0f172a; color:#fff; border-radius:0.5rem; padding:0.6rem 1rem; display:flex; align-items:center; justify-content:space-between; }
+  .grand-total-bar .gt-label { font-size:0.68rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; opacity:0.8; }
+  .grand-total-bar .gt-value { font-size:1.1rem; font-weight:700; }
+  .overshort-box { background:#fff; border:1px solid #e2e8f0; border-radius:0.5rem; padding:0.65rem 1rem; display:flex; align-items:center; justify-content:space-between; }
+  .purchase-row-label { font-size:0.68rem; font-weight:700; letter-spacing:0.04em; color:#64748b; text-transform:uppercase; margin-bottom:0.2rem; }
+  input.vendor-field { max-width:none; }
+  /* Hide native number input spinners so no floating icons sit inside fields */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  input[type="number"] { -moz-appearance:textfield; }
+</style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+<!-- ============ TOP NAVIGATION ============ -->
+<nav id="topNav" class="bg-slate-900 text-slate-100 shadow-md hidden">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-xl font-bold tracking-wide">🏪 C-Store Sales Tracker</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <span id="navUserInfo" class="text-sm text-slate-300"></span>
+      <span id="navRoleBadge" class="text-xs font-semibold px-2 py-1 rounded bg-blue-600 uppercase"></span>
+      <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded">Logout</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ TOAST ============ -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="loginScreen" class="min-h-screen flex items-center justify-center">
+  <div class="card w-full max-w-sm p-8">
+    <div class="text-center mb-6">
+      <div class="text-3xl mb-2">🏪</div>
+      <h1 class="text-xl font-bold text-slate-800">C-Store Sales Tracker</h1>
+      <p class="text-sm text-slate-500">Sign in to continue</p>
+    </div>
+    <form id="loginForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Your Name</label>
+        <input type="text" id="loginName" required placeholder="e.g. John Smith" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
+        <select id="loginRole" required>
+          <option value="">Select role...</option>
+          <option value="employee">Employee</option>
+          <option value="manager">Manager</option>
+        </select>
+      </div>
+      <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 rounded">
+        Sign In
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ============ EMPLOYEE VIEW ============ -->
+<div id="employeeView" class="hidden max-w-5xl mx-auto px-4 py-4 space-y-4">
+  <h2 class="text-xl font-bold text-slate-800 mb-2">Daily Report Entry Form</h2>
+
+  <form id="dailyReportForm" class="card p-4 space-y-4">
+    <div class="flex flex-wrap items-end gap-4 pb-1">
+      <div style="min-width:170px;">
+        <label class="field-label">Date</label>
+        <input type="date" id="reportDate" required class="field-input" style="min-width:170px;" />
+      </div>
+      <span id="reportDayOfWeek" class="text-slate-500 text-sm pb-2"></span>
+    </div>
+
+    <!-- SECTION 01 -->
+    <div>
+      <div class="pos-section-header"><span class="num">01</span>Lottery &amp; Lotto</div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-2" style="max-width:640px;">
+        <div>
+          <label class="field-label">Lottery Ring</label>
+          <div class="field-wrap">
+            <span class="dollar-prefix">$</span>
+            <input type="number" step="0.01" id="lotteryRing" class="lotto-input field-input" placeholder="0.00" value="0" />
+          </div>
+        </div>
+        <div>
+          <label class="field-label">Lottery Actual</label>
+          <div class="field-wrap">
+            <span class="dollar-prefix">$</span>
+            <input type="number" step="0.01" id="lotteryActual" class="lotto-input field-input" placeholder="0.00" value="0" />
+          </div>
+        </div>
+        <div>
+          <label class="field-label">Difference</label>
+          <div class="field-wrap">
+            <span class="dollar-prefix">$</span>
+            <input type="text" id="lotteryDiff" readonly class="field-input field-readonly" value="0.00" />
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3" style="max-width:640px;">
+        <div>
+          <label class="field-label">Lotto Ring</label>
+          <div class="field-wrap">
+            <span class="dollar-prefix">$</span>
+            <input type="number" step="0.01" id="lottoRing" class="lotto-input field-input" placeholder="0.00" value="0" />
+          </div>
+        </div>
+        <div>
+          <label class="field-label">Lotto Actual</label>
+          <div class="field-wrap">
+            <span class="dollar-prefix">$</span>
+            <input type="number" step="0.01" id="lottoActual" class="lotto-input field-input" placeholder="0.00" value="0" />
+          </div>
+        </div>
+        <div>
+          <label class="field-label">Difference</label>
+          <div class="field-wrap">
+            <span class="dollar-prefix">$</span>
+            <input type="text" id="lottoDiff" readonly class="field-input field-readonly" value="0.00" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 02 -->
+    <div>
+      <div class="pos-section-header"><span class="num">02</span>Sales &amp; Settlements</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-10" style="max-width:720px;">
+        <!-- SALES COLUMN -->
+        <div class="space-y-3">
+          <h4 class="text-xs font-bold tracking-wide text-slate-800 uppercase">Sales</h4>
+          <div>
+            <label class="field-label">Total Sales</label>
+            <div class="field-wrap">
+              <span class="dollar-prefix">$</span>
+              <input type="number" step="0.01" id="totalSales" class="calc-input field-input" placeholder="0.00" value="0" />
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Sales Tax</label>
+            <div class="field-wrap">
+              <span class="dollar-prefix">$</span>
+              <input type="number" step="0.01" id="salesTax" class="calc-input field-input" placeholder="0.00" value="0" />
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Actual Lotto and Lottery</label>
+            <div class="field-wrap">
+              <span class="dollar-prefix">$</span>
+              <input type="text" id="actualLottoLottery" readonly class="field-input field-readonly" value="0.00" />
+            </div>
+          </div>
+        </div>
+        <!-- SETTLEMENTS & CASH COLUMN -->
+        <div class="space-y-3">
+          <h4 class="text-xs font-bold tracking-wide text-slate-800 uppercase">Settlements &amp; Cash</h4>
+          <div>
+            <label class="field-label">Settlement 1</label>
+            <div class="field-wrap">
+              <span class="dollar-prefix">$</span>
+              <input type="number" step="0.01" id="settlement1" class="calc-input field-input" placeholder="0.00" value="0" />
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Settlement 2</label>
+            <div class="field-wrap">
+              <span class="dollar-prefix">$</span>
+              <input type="number" step="0.01" id="settlement2" class="calc-input field-input" placeholder="0.00" value="0" />
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Lottery Payout</label>
+            <div class="field-wrap">
+              <span class="dollar-prefix">$</span>
+              <input type="number" step="0.01" id="lotteryPayout" class="calc-input field-input" placeholder="0.00" value="0" />
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Total Cash Payout</label>
+            <div class="field-wrap">
+              <span class="dollar-prefix">$</span>
+              <input type="number" step="0.01" id="totalCashPayout" class="calc-input field-input" placeholder="0.00" value="0" />
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Cash in Hand</label>
+            <div class="field-wrap">
+              <span class="dollar-prefix">$</span>
+              <input type="number" step="0.01" id="cashInHand" class="calc-input field-input" placeholder="0.00" value="0" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRAND TOTALS -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mt-4" style="max-width:720px;">
+        <div class="grand-total-bar">
+          <span class="gt-label">Grand Total</span>
+          <span class="gt-value" id="grandTotalSales">$0.00</span>
+        </div>
+        <div class="grand-total-bar">
+          <span class="gt-label">Grand Total</span>
+          <span class="gt-value" id="grandTotalSettlements">$0.00</span>
+        </div>
+      </div>
+
+      <!-- OVER / SHORT -->
+      <div class="overshort-box mt-4" style="max-width:720px;">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">⚖️</span>
+          <div>
+            <div class="text-xs font-bold tracking-wide text-slate-500 uppercase">Over / Short</div>
+            <div class="text-sm text-slate-400">Enter figures</div>
+          </div>
+        </div>
+        <div id="overShort" class="text-2xl font-bold text-slate-800">$0.00</div>
+      </div>
+    </div>
+
+    <!-- SECTION 03 -->
+    <div>
+      <div class="pos-section-header"><span class="num">03</span>Inventory Purchases</div>
+      <div id="purchaseRows" class="space-y-3"></div>
+      <div class="flex items-center justify-between mt-3">
+        <button type="button" id="addPurchaseRow" class="border border-slate-300 hover:bg-slate-50 text-slate-800 text-sm font-semibold px-4 py-2 rounded flex items-center gap-1">
+          <span class="text-base leading-none">+</span> Add More Purchases
+        </button>
+        <span class="text-sm text-slate-700">Total <span class="font-bold text-slate-900">$<span id="purchasesTotal">0.00</span></span></span>
+      </div>
+    </div>
+
+    <!-- SECTION 04 -->
+    <div>
+      <div class="pos-section-header"><span class="num">04</span>Shift Notes</div>
+      <textarea id="shiftNotes" rows="4" placeholder="Enter any comments about the shift..." class="field-input"></textarea>
+    </div>
+
+    <div>
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold tracking-wide uppercase text-sm py-4 rounded shadow">
+        Submit Daily Report
+      </button>
+      <p class="text-center text-xs text-slate-400 mt-3">Entries are saved securely. Past reports are not visible on this screen.</p>
+    </div>
+  </form>
+</div>
+
+<!-- ============ MANAGER VIEW ============ -->
+<div id="managerView" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
+  <h2 class="text-2xl font-bold text-slate-800">Analytics Dashboard</h2>
+
+  <!-- Filters -->
+  <div class="card p-4 flex flex-wrap items-end gap-4">
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+      <input type="date" id="filterStart" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+      <input type="date" id="filterEnd" />
+    </div>
+    <button id="applyFilterBtn" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded font-semibold">Apply</button>
+    <button id="exportExcelBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold">Export to Excel</button>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div class="card p-4 text-center">
+      <div class="text-xs text-slate-500 uppercase">Total Sales</div>
+      <div id="sumTotalSales" class="text-xl font-bold text-slate-800">$0.00</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div class="text-xs text-slate-500 uppercase">Total Over/Short</div>
+      <div id="sumOverShort" class="text-xl font-bold text-slate-800">$0.00</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div class="text-xs text-slate-500 uppercase">Total Purchases</div>
+      <div id="sumPurchases" class="text-xl font-bold text-slate-800">$0.00</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div class="text-xs text-slate-500 uppercase">Avg Daily Sales</div>
+      <div id="sumAvgSales" class="text-xl font-bold text-slate-800">$0.00</div>
+    </div>
+    <div class="card p-4 text-center">
+      <div class="text-xs text-slate-500 uppercase">Reports</div>
+      <div id="sumCount" class="text-xl font-bold text-slate-800">0</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card p-4">
+      <h3 class="font-semibold text-slate-700 mb-2">Total Sales Over Time</h3>
+      <canvas id="salesLineChart" height="180"></canvas>
+    </div>
+    <div class="card p-4">
+      <h3 class="font-semibold text-slate-700 mb-2">Over / Short by Day</h3>
+      <canvas id="overShortBarChart" height="180"></canvas>
+    </div>
+    <div class="card p-4 lg:col-span-2">
+      <h3 class="font-semibold text-slate-700 mb-2">Purchases by Vendor</h3>
+      <div class="max-w-md mx-auto">
+        <canvas id="vendorPieChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data table -->
+  <div class="card p-4 overflow-x-auto">
+    <h3 class="font-semibold text-slate-700 mb-3">Daily Reports</h3>
+    <table class="min-w-full text-sm">
+      <thead>
+        <tr class="text-left border-b border-slate-300 text-slate-600">
+          <th class="py-2 pr-4">Date</th>
+          <th class="py-2 pr-4">Employee</th>
+          <th class="py-2 pr-4">Total Sales</th>
+          <th class="py-2 pr-4">Over/Short</th>
+          <th class="py-2 pr-4">Purchases Total</th>
+          <th class="py-2 pr-4">Notes</th>
+        </tr>
+      </thead>
+      <tbody id="reportsTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   SUPABASE CONFIGURATION
+   ========================================================= */
+const SUPABASE_URL = "https://ziqnwfawmhbpldpsadzt.supabase.co";
+const SUPABASE_KEY = "sb_publishable_qrYg2_WD_PL-3kMk_EOyGw_kITVMCxg";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const TABLE_NAME = "daily_reports";
+
+/* =========================================================
+   TOAST HELPER
+   ========================================================= */
+function showToast(message, type = "success") {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.className = "toast px-4 py-3 rounded shadow-lg text-white font-medium " +
+    (type === "success" ? "bg-green-600" : "bg-red-600");
+  toast.classList.remove("hidden");
+  setTimeout(() => toast.classList.add("hidden"), 3500);
+}
+
+/* =========================================================
+   LOGIN / ROLE ROUTING
+   ========================================================= */
+const loginScreen = document.getElementById("loginScreen");
+const topNav = document.getElementById("topNav");
+const employeeView = document.getElementById("employeeView");
+const managerView = document.getElementById("managerView");
+const navUserInfo = document.getElementById("navUserInfo");
+const navRoleBadge = document.getElementById("navRoleBadge");
+
+function applySession(name, role) {
+  navUserInfo.textContent = `Signed in as ${name}`;
+  navRoleBadge.textContent = role;
+  loginScreen.classList.add("hidden");
+  topNav.classList.remove("hidden");
+
+  if (role === "employee") {
+    employeeView.classList.remove("hidden");
+    managerView.classList.add("hidden");
+    document.getElementById("reportDate").valueAsDate = new Date();
+    updateReportDayOfWeek();
+  } else {
+    managerView.classList.remove("hidden");
+    employeeView.classList.add("hidden");
+    const today = new Date();
+    const lastMonth = new Date();
+    lastMonth.setDate(today.getDate() - 30);
+    document.getElementById("filterStart").valueAsDate = lastMonth;
+    document.getElementById("filterEnd").valueAsDate = today;
+    loadDashboardData();
+  }
+}
+
+document.getElementById("loginForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = document.getElementById("loginName").value.trim();
+  const role = document.getElementById("loginRole").value;
+  if (!name || !role) return;
+  sessionStorage.setItem("cstore_user", JSON.stringify({ name, role }));
+  applySession(name, role);
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  sessionStorage.removeItem("cstore_user");
+  location.reload();
+});
+
+(function restoreSession() {
+  const saved = sessionStorage.getItem("cstore_user");
+  if (saved) {
+    const { name, role } = JSON.parse(saved);
+    applySession(name, role);
+  }
+})();
+
+/* =========================================================
+   REPORT DATE — DAY OF WEEK DISPLAY
+   ========================================================= */
+function updateReportDayOfWeek() {
+  const dateInput = document.getElementById("reportDate");
+  const dayEl = document.getElementById("reportDayOfWeek");
+  if (!dateInput.value) { dayEl.textContent = ""; return; }
+  const d = new Date(dateInput.value + "T00:00:00");
+  dayEl.textContent = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "2-digit", year: "numeric" });
+}
+document.getElementById("reportDate").addEventListener("change", updateReportDayOfWeek);
+
+/* =========================================================
+   SECTION 01 — LOTTERY & LOTTO CALCULATIONS
+   ========================================================= */
+function num(id) {
+  const v = parseFloat(document.getElementById(id).value);
+  return isNaN(v) ? 0 : v;
+}
+
+function recalcLottery() {
+  const lotteryDiff = num("lotteryRing") - num("lotteryActual");
+  document.getElementById("lotteryDiff").value = lotteryDiff.toFixed(2);
+
+  const lottoDiff = num("lottoRing") - num("lottoActual");
+  document.getElementById("lottoDiff").value = lottoDiff.toFixed(2);
+
+  const actualLottoLottery = num("lotteryActual") + num("lottoActual");
+  document.getElementById("actualLottoLottery").value = actualLottoLottery.toFixed(2);
+
+  recalcSales();
+}
+document.querySelectorAll(".lotto-input").forEach(el => el.addEventListener("input", recalcLottery));
+
+/* =========================================================
+   SECTION 02 — SALES & SETTLEMENTS CALCULATIONS
+   ========================================================= */
+function recalcSales() {
+  const totalSales = num("totalSales");
+  const salesTax = num("salesTax");
+  const actualLottoLottery = num("lotteryActual") + num("lottoActual");
+  const settlement1 = num("settlement1");
+  const settlement2 = num("settlement2");
+  const lotteryPayout = num("lotteryPayout");
+  const totalCashPayout = num("totalCashPayout");
+  const cashInHand = num("cashInHand");
+
+  // Grand total for the Sales column
+  const grandTotalSales = totalSales + salesTax + actualLottoLottery;
+  // Grand total for the Settlements & Cash column
+  const grandTotalSettlements = settlement1 + settlement2 + lotteryPayout + totalCashPayout + cashInHand;
+
+  document.getElementById("grandTotalSales").textContent = "$" + grandTotalSales.toFixed(2);
+  document.getElementById("grandTotalSettlements").textContent = "$" + grandTotalSettlements.toFixed(2);
+
+  // Over/Short = Grand Total Settlements & Cash - Grand Total Sales
+  const overShort = grandTotalSettlements - grandTotalSales;
+
+  const overShortEl = document.getElementById("overShort");
+  overShortEl.textContent = "$" + Math.abs(overShort).toFixed(2);
+  if (overShort < 0) overShortEl.textContent = "-" + overShortEl.textContent;
+  overShortEl.classList.remove("text-green-600", "text-red-600", "text-slate-800");
+  if (overShort > 0) overShortEl.classList.add("text-green-600");
+  else if (overShort < 0) overShortEl.classList.add("text-red-600");
+  else overShortEl.classList.add("text-slate-800");
+}
+document.querySelectorAll(".calc-input").forEach(el => el.addEventListener("input", recalcSales));
+
+/* =========================================================
+   SECTION 03 — DYNAMIC INVENTORY PURCHASE ROWS
+   ========================================================= */
+const purchaseRowsContainer = document.getElementById("purchaseRows");
+
+function renumberPurchaseRows() {
+  document.querySelectorAll(".purchase-row").forEach((row, idx) => {
+    row.querySelector(".purchase-row-number").textContent = "Purchase " + (idx + 1);
+  });
+}
+
+function createPurchaseRow() {
+  const row = document.createElement("div");
+  row.className = "purchase-row";
+  row.innerHTML = `
+    <div class="purchase-row-label purchase-row-number">Purchase</div>
+    <div class="flex gap-3 items-center" style="max-width:520px;">
+      <input type="text" placeholder="Vendor" class="vendor-input field-input vendor-field" style="width:220px;" />
+      <div class="field-wrap" style="width:180px;">
+        <span class="dollar-prefix">$</span>
+        <input type="number" step="0.01" placeholder="0.00" value="0" class="amount-input field-input" />
+      </div>
+      <button type="button" class="remove-row-btn text-slate-400 hover:text-red-600 text-base leading-none w-6 h-6 flex items-center justify-center rounded hover:bg-red-50 flex-shrink-0">✕</button>
+    </div>
+  `;
+  row.querySelector(".amount-input").addEventListener("input", recalcPurchases);
+  row.querySelector(".remove-row-btn").addEventListener("click", () => {
+    row.remove();
+    renumberPurchaseRows();
+    recalcPurchases();
+  });
+  purchaseRowsContainer.appendChild(row);
+  renumberPurchaseRows();
+}
+
+function recalcPurchases() {
+  let total = 0;
+  document.querySelectorAll(".amount-input").forEach(el => {
+    const v = parseFloat(el.value);
+    if (!isNaN(v)) total += v;
+  });
+  document.getElementById("purchasesTotal").textContent = total.toFixed(2);
+}
+
+document.getElementById("addPurchaseRow").addEventListener("click", createPurchaseRow);
+createPurchaseRow(); // default purchase row 1
+createPurchaseRow(); // default purchase row 2
+
+/* =========================================================
+   EMPLOYEE FORM SUBMISSION
+   ========================================================= */
+document.getElementById("dailyReportForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const session = JSON.parse(sessionStorage.getItem("cstore_user") || "{}");
+
+  const purchases = [];
+  document.querySelectorAll(".purchase-row").forEach(row => {
+    const vendor = row.querySelector(".vendor-input").value.trim();
+    const amount = parseFloat(row.querySelector(".amount-input").value) || 0;
+    if (vendor || amount) purchases.push({ vendor, amount });
+  });
+  const purchasesTotal = purchases.reduce((s, p) => s + p.amount, 0);
+
+  const totalSales = num("totalSales");
+  const salesTax = num("salesTax");
+  const actualLottoLottery = num("lotteryActual") + num("lottoActual");
+  const settlement1 = num("settlement1");
+  const settlement2 = num("settlement2");
+  const lotteryPayout = num("lotteryPayout");
+  const totalCashPayout = num("totalCashPayout");
+  const cashInHand = num("cashInHand");
+
+  const grandTotalSales = totalSales + salesTax + actualLottoLottery;
+  const grandTotalSettlements = settlement1 + settlement2 + lotteryPayout + totalCashPayout + cashInHand;
+  // Over/Short = Grand Total Settlements & Cash - Grand Total Sales
+  const overShort = grandTotalSettlements - grandTotalSales;
+
+  const payload = {
+    date: document.getElementById("reportDate").value,
+    employee_name: session.name || "Unknown",
+    lottery_ring: num("lotteryRing"),
+    lottery_actual: num("lotteryActual"),
+    lottery_diff: num("lotteryRing") - num("lotteryActual"),
+    lotto_ring: num("lottoRing"),
+    lotto_actual: num("lottoActual"),
+    lotto_diff: num("lottoRing") - num("lottoActual"),
+    total_sales: totalSales,
+    sales_tax: salesTax,
+    actual_lotto_lottery: num("lotteryActual") + num("lottoActual"),
+    settlement_1: settlement1,
+    settlement_2: settlement2,
+    lottery_payout: lotteryPayout,
+    total_cash_payout: totalCashPayout,
+    cash_in_hand: cashInHand,
+    over_short: overShort,
+    inventory_purchases: purchases,
+    purchases_total: purchasesTotal,
+    shift_notes: document.getElementById("shiftNotes").value.trim()
+  };
+
+  const submitBtn = e.target.querySelector("button[type=submit]");
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Submitting...";
+
+  const { error } = await supabaseClient.from(TABLE_NAME).insert([payload]);
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = "Submit Daily Report";
+
+  if (error) {
+    console.error(error);
+    showToast("Error saving report: " + error.message, "error");
+  } else {
+    showToast("Daily report submitted successfully!");
+    e.target.reset();
+    document.getElementById("reportDate").valueAsDate = new Date();
+    updateReportDayOfWeek();
+    purchaseRowsContainer.innerHTML = "";
+    createPurchaseRow();
+    createPurchaseRow();
+    recalcLottery();
+    recalcSales();
+    recalcPurchases();
+  }
+});
+
+/* =========================================================
+   MANAGER DASHBOARD
+   ========================================================= */
+let salesLineChart, overShortBarChart, vendorPieChart;
+let currentReports = [];
+
+async function loadDashboardData() {
+  const start = document.getElementById("filterStart").value;
+  const end = document.getElementById("filterEnd").value;
+
+  let query = supabaseClient.from(TABLE_NAME).select("*").order("date", { ascending: true });
+  if (start) query = query.gte("date", start);
+  if (end) query = query.lte("date", end);
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error(error);
+    showToast("Error loading reports: " + error.message, "error");
+    return;
+  }
+
+  currentReports = data || [];
+  renderSummary(currentReports);
+  renderCharts(currentReports);
+  renderTable(currentReports);
+}
+
+function renderSummary(reports) {
+  const totalSales = reports.reduce((s, r) => s + (parseFloat(r.total_sales) || 0), 0);
+  const totalOverShort = reports.reduce((s, r) => s + (parseFloat(r.over_short) || 0), 0);
+  const totalPurchases = reports.reduce((s, r) => s + (parseFloat(r.purchases_total) || 0), 0);
+  const avgSales = reports.length ? totalSales / reports.length : 0;
+
+  document.getElementById("sumTotalSales").textContent = "$" + totalSales.toFixed(2);
+  document.getElementById("sumOverShort").textContent = "$" + totalOverShort.toFixed(2);
+  document.getElementById("sumPurchases").textContent = "$" + totalPurchases.toFixed(2);
+  document.getElementById("sumAvgSales").textContent = "$" + avgSales.toFixed(2);
+  document.getElementById("sumCount").textContent = reports.length;
+}
+
+function renderCharts(reports) {
+  const labels = reports.map(r => r.date);
+  const salesData = reports.map(r => parseFloat(r.total_sales) || 0);
+  const overShortData = reports.map(r => parseFloat(r.over_short) || 0);
+
+  const vendorTotals = {};
+  reports.forEach(r => {
+    (r.inventory_purchases || []).forEach(p => {
+      const vendor = p.vendor || "Unknown";
+      vendorTotals[vendor] = (vendorTotals[vendor] || 0) + (parseFloat(p.amount) || 0);
+    });
+  });
+  const vendorLabels = Object.keys(vendorTotals);
+  const vendorData = Object.values(vendorTotals);
+
+  if (salesLineChart) salesLineChart.destroy();
+  if (overShortBarChart) overShortBarChart.destroy();
+  if (vendorPieChart) vendorPieChart.destroy();
+
+  salesLineChart = new Chart(document.getElementById("salesLineChart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Total Sales ($)",
+        data: salesData,
+        borderColor: "#1d4ed8",
+        backgroundColor: "rgba(29,78,216,0.1)",
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  overShortBarChart = new Chart(document.getElementById("overShortBarChart"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "Over/Short ($)",
+        data: overShortData,
+        backgroundColor: overShortData.map(v => v < 0 ? "#dc2626" : "#16a34a")
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  vendorPieChart = new Chart(document.getElementById("vendorPieChart"), {
+    type: "doughnut",
+    data: {
+      labels: vendorLabels,
+      datasets: [{
+        data: vendorData,
+        backgroundColor: ["#1d4ed8","#16a34a","#dc2626","#ca8a04","#9333ea","#0891b2","#ea580c","#4b5563"]
+      }]
+    },
+    options: { responsive: true }
+  });
+}
+
+function renderTable(reports) {
+  const tbody = document.getElementById("reportsTableBody");
+  tbody.innerHTML = "";
+  reports.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-slate-100 hover:bg-slate-50";
+    tr.innerHTML = `
+      <td class="py-2 pr-4">${r.date ?? ""}</td>
+      <td class="py-2 pr-4">${r.employee_name ?? ""}</td>
+      <td class="py-2 pr-4">$${(parseFloat(r.total_sales) || 0).toFixed(2)}</td>
+      <td class="py-2 pr-4 ${parseFloat(r.over_short) < 0 ? "text-red-600" : "text-green-600"} font-medium">$${(parseFloat(r.over_short) || 0).toFixed(2)}</td>
+      <td class="py-2 pr-4">$${(parseFloat(r.purchases_total) || 0).toFixed(2)}</td>
+      <td class="py-2 pr-4 text-slate-500">${r.shift_notes ?? ""}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById("applyFilterBtn").addEventListener("click", loadDashboardData);
+
+/* =========================================================
+   CLEAR "0" ON INPUT FOCUS (event delegation so it covers
+   dynamically added purchase rows too)
+   ========================================================= */
+document.addEventListener("focusin", (e) => {
+  if (e.target.matches("input[type=number]")) {
+    if (e.target.value === "0" || e.target.value === "") e.target.value = "";
+  }
+});
+document.addEventListener("focusout", (e) => {
+  if (e.target.matches("input[type=number]")) {
+    if (e.target.value === "") e.target.value = "0";
+  }
+});
+
+/* =========================================================
+   EXCEL EXPORT (SheetJS)
+   ========================================================= */
+document.getElementById("exportExcelBtn").addEventListener("click", () => {
+  if (!currentReports.length) {
+    showToast("No data to export", "error");
+    return;
+  }
+  const exportData = currentReports.map(r => ({
+    Date: r.date,
+    Employee: r.employee_name,
+    "Lottery Ring": r.lottery_ring,
+    "Lottery Actual": r.lottery_actual,
+    "Lottery Diff": r.lottery_diff,
+    "Lotto Ring": r.lotto_ring,
+    "Lotto Actual": r.lotto_actual,
+    "Lotto Diff": r.lotto_diff,
+    "Total Sales": r.total_sales,
+    "Sales Tax": r.sales_tax,
+    "Settlement 1": r.settlement_1,
+    "Settlement 2": r.settlement_2,
+    "Lottery Payout": r.lottery_payout,
+    "Total Cash Payout": r.total_cash_payout,
+    "Cash in Hand": r.cash_in_hand,
+    "Over/Short": r.over_short,
+    "Purchases Total": r.purchases_total,
+    "Shift Notes": r.shift_notes
+  }));
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Daily Reports");
+  XLSX.writeFile(wb, `daily_reports_${document.getElementById("filterStart").value}_to_${document.getElementById("filterEnd").value}.xlsx`);
+});
+</script>
+</body>
+</html>
