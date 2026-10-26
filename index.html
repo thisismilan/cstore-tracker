@@ -52,6 +52,7 @@
     <div class="flex items-center gap-4">
       <span id="navUserInfo" class="text-sm text-slate-300"></span>
       <span id="navRoleBadge" class="text-xs font-semibold px-2 py-1 rounded bg-blue-600 uppercase"></span>
+      <button id="vendorMgmtBtn" onclick="openVendorModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded hidden">Manage Vendors</button>
       <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded">Logout</button>
     </div>
   </div>
@@ -344,17 +345,26 @@
       <canvas id="salesLineChart" height="180"></canvas>
     </div>
     <div class="card p-4">
-      <h3 class="font-semibold text-slate-700 mb-2">Over / Short by Day</h3>
-      <canvas id="overShortBarChart" height="180"></canvas>
-    </div>
-    <div class="card p-4">
       <h3 class="font-semibold text-slate-700 mb-2">Current Inventory Over Time</h3>
       <canvas id="inventoryLineChart" height="180"></canvas>
     </div>
     <div class="card p-4 lg:col-span-2">
       <h3 class="font-semibold text-slate-700 mb-2">Purchases by Vendor</h3>
-      <div class="max-w-md mx-auto">
-        <canvas id="vendorPieChart" height="180"></canvas>
+      <div class="flex flex-col md:flex-row gap-4">
+        <div class="max-w-md mx-auto">
+          <canvas id="vendorPieChart" height="180"></canvas>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-medium text-slate-600">Vendor Purchase List</h4>
+            <div class="flex gap-2">
+              <button id="vendorPrevMonth" class="text-slate-600 hover:text-slate-900 text-sm">&larr; Prev</button>
+              <span id="vendorMonthLabel" class="text-sm font-semibold text-slate-800"></span>
+              <button id="vendorNextMonth" class="text-slate-600 hover:text-slate-900 text-sm">Next &rarr;</button>
+            </div>
+          </div>
+          <div id="vendorList" class="max-h-64 overflow-y-auto border border-slate-200 rounded"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -415,6 +425,14 @@ function applySession(name, role) {
   loginScreen.classList.add("hidden");
   topNav.classList.remove("hidden");
 
+  // Show Manage Vendors button for employee and manager
+  const vendorMgmtBtn = document.getElementById("vendorMgmtBtn");
+  if (role === "employee" || role === "manager") {
+    vendorMgmtBtn.classList.remove("hidden");
+  } else {
+    vendorMgmtBtn.classList.add("hidden");
+  }
+
   if (role === "employee") {
     employeeView.classList.remove("hidden");
     managerView.classList.add("hidden");
@@ -424,11 +442,11 @@ function applySession(name, role) {
     managerView.classList.remove("hidden");
     employeeView.classList.add("hidden");
     const today = new Date();
-    const lastMonth = new Date();
-    lastMonth.setDate(today.getDate() - 30);
-    document.getElementById("filterStart").valueAsDate = lastMonth;
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById("filterStart").valueAsDate = firstDayOfMonth;
     document.getElementById("filterEnd").valueAsDate = today;
     loadDashboardData();
+    renderCalendar();
   }
 }
 
@@ -570,24 +588,47 @@ function createPurchaseRow(vendorName = "") {
   renumberPurchaseRows();
 }
 
-function addNewVendorRow(selectedSelect, currentRow) {
+async function addNewVendorRow(selectedSelect, currentRow) {
   const newVendorName = prompt("Enter new vendor name:");
   if (newVendorName && newVendorName.trim()) {
-    newVendorName.trim();
-    // Add to existing vendors list
-    if (!window.existingVendors) window.existingVendors = [];
-    if (!window.existingVendors.includes(newVendorName)) {
-      window.existingVendors.push(newVendorName);
-      // Reload existing rows to include new vendor
-      document.querySelectorAll(".purchase-row .vendor-select").forEach(select => {
-        const newOption = document.createElement("option");
-        newOption.value = newVendorName;
-        newOption.textContent = newVendorName;
-        select.appendChild(newOption);
-      });
+    const trimmedName = newVendorName.trim();
+    
+    // Save to Supabase
+    try {
+      const { error } = await supabaseClient
+        .from('vendors')
+        .insert([{ name: trimmedName, is_active: true }])
+        .select();
+      
+      if (error) {
+        // If vendor already exists, that's fine - just continue
+        if (error.code !== '23505') {
+          showToast('Error saving vendor: ' + error.message, 'error');
+          return;
+        }
+      }
+      
+      // Add to existing vendors list
+      if (!window.existingVendors) window.existingVendors = [];
+      if (!window.existingVendors.includes(trimmedName)) {
+        window.existingVendors.push(trimmedName);
+        // Reload existing rows to include new vendor
+        document.querySelectorAll(".purchase-row .vendor-select").forEach(select => {
+          const newOption = document.createElement("option");
+          newOption.value = trimmedName;
+          newOption.textContent = trimmedName;
+          select.appendChild(newOption);
+        });
+      }
+      
+      showToast(`Vendor "${trimmedName}" saved to database`);
+    } catch (err) {
+      showToast('Error saving vendor: ' + err.message, 'error');
+      return;
     }
+    
     // Select the new vendor in current row
-    selectedSelect.value = newVendorName;
+    selectedSelect.value = trimmedName;
   }
 }
 
@@ -717,8 +758,9 @@ document.getElementById("dailyReportForm").addEventListener("submit", async (e) 
 /* =========================================================
    MANAGER DASHBOARD
    ========================================================= */
-let salesLineChart, overShortBarChart, vendorPieChart, inventoryLineChart;
+let salesLineChart, vendorPieChart, inventoryLineChart;
 let currentReports = [];
+let vendorViewYear, vendorViewMonth;
 
 async function loadDashboardData() {
   const start = document.getElementById("filterStart").value;
@@ -741,6 +783,7 @@ async function loadDashboardData() {
   renderCharts(currentReports);
   renderTable(currentReports);
   renderCalendar();
+  renderVendorList();
 }
 
 function renderSummary(reports) {
@@ -776,7 +819,6 @@ function renderCharts(reports) {
   const vendorData = Object.values(vendorTotals);
 
   if (salesLineChart) salesLineChart.destroy();
-  if (overShortBarChart) overShortBarChart.destroy();
   if (vendorPieChart) vendorPieChart.destroy();
   if (inventoryLineChart) inventoryLineChart.destroy();
 
@@ -862,7 +904,7 @@ function renderCalendar() {
   const calMonthYear = document.getElementById("calMonthYear");
   const now = new Date();
   const viewYear = calYear || now.getFullYear();
-  const viewMonth = calMonth || (now.getMonth() - 1); // 0-indexed
+  const viewMonth = calMonth ?? now.getMonth(); // 0-indexed, default to current month
   calMonthYear.textContent = new Date(viewYear, viewMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   const firstDay = new Date(viewYear, viewMonth, 1);
@@ -903,6 +945,55 @@ document.getElementById("calNextMonth").addEventListener("click", () => {
   renderCalendar();
 });
 
+function renderVendorList() {
+  const vendorListEl = document.getElementById("vendorList");
+  const vendorMonthLabel = document.getElementById("vendorMonthLabel");
+  const now = new Date();
+  const viewYear = vendorViewYear || now.getFullYear();
+  const viewMonth = vendorViewMonth ?? now.getMonth();
+  
+  vendorMonthLabel.textContent = new Date(viewYear, viewMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  
+  // Collect vendor totals for this month
+  const vendorTotals = {};
+  currentReports.forEach(r => {
+    const d = new Date(r.date + "T00:00:00");
+    if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) {
+      (r.inventory_purchases || []).forEach(p => {
+        const vendor = p.vendor || "Unknown";
+        vendorTotals[vendor] = (vendorTotals[vendor] || 0) + (parseFloat(p.amount) || 0);
+      });
+    }
+  });
+  
+  // Sort by amount descending
+  const sortedVendors = Object.entries(vendorTotals).sort((a, b) => b[1] - a[1]);
+  
+  if (sortedVendors.length === 0) {
+    vendorListEl.innerHTML = '<div class="p-4 text-slate-400 text-sm text-center">No purchases this month</div>';
+    return;
+  }
+  
+  vendorListEl.innerHTML = sortedVendors.map(([vendor, amount]) => `
+    <div class="flex justify-between items-center p-2 border-b border-slate-100 text-sm">
+      <span class="font-medium text-slate-800">${vendor}</span>
+      <span class="font-bold text-slate-900">$${amount.toFixed(2)}</span>
+    </div>
+  `).join('');
+}
+
+document.getElementById("vendorPrevMonth").addEventListener("click", () => {
+  vendorViewMonth = (vendorViewMonth ?? (new Date().getMonth() - 1)) - 1;
+  if (vendorViewMonth < 0) { vendorViewMonth = 11; vendorViewYear = (vendorViewYear ?? new Date().getFullYear()) - 1; }
+  renderVendorList();
+});
+
+document.getElementById("vendorNextMonth").addEventListener("click", () => {
+  vendorViewMonth = (vendorViewMonth ?? (new Date().getMonth() - 1)) + 1;
+  if (vendorViewMonth > 11) { vendorViewMonth = 0; vendorViewYear = (vendorViewYear ?? new Date().getFullYear()) + 1; }
+  renderVendorList();
+});
+
 document.getElementById("applyFilterBtn").addEventListener("click", loadDashboardData);
 
 /* =========================================================
@@ -938,110 +1029,236 @@ document.getElementById("exportExcelBtn").addEventListener("click", () => {
   XLSX.utils.book_append_sheet(wb, ws, "Daily Reports");
   XLSX.writeFile(wb, `daily_reports_${document.getElementById("filterStart").value}_to_${document.getElementById("filterEnd").value}.xlsx`);
 });
+
+/* =========================================================
+   VENDOR DATABASE - LOAD FROM SUPABASE
+   ========================================================= */
+async function loadVendorsFromSupabase() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('vendors')
+      .select('name, id')
+      .order('name', { ascending: true });
+    
+    if (error) throw error;
+    window.existingVendors = data ? data.map(v => v.name) : [];
+    renderVendorDropdowns();
+    showToast(`Loaded ${window.existingVendors.length} vendors from database`);
+  } catch (err) {
+    console.error('Error loading vendors:', err);
+    showToast('Error loading vendors: ' + err.message, 'error');
+  }
+}
+
+function renderVendorDropdowns() {
+  const vendorOptions = window.existingVendors 
+    ? window.existingVendors.map(v => `<option value="${v}">${v}</option>`).join('')
+    : '';
+  
+  const newVendorOption = '<option value="new" class="new-vendor-option">+ Add New Vendor</option>';
+  
+  document.querySelectorAll('.vendor-select').forEach(select => {
+    select.innerHTML = '<option value="">Select vendor...</option>' + vendorOptions + newVendorOption;
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const session = JSON.parse(sessionStorage.getItem('cstore_user') || '{}');
+  if (session.role === 'employee' || session.role === 'manager') {
+    loadVendorsFromSupabase();
+  }
+});
+
+function openVendorModal() {
+  document.getElementById('vendorModal').classList.remove('hidden');
+  loadExistingVendorsForModal();
+}
+
+function closeVendorModal() {
+  document.getElementById('vendorModal').classList.add('hidden');
+}
+
+async function loadExistingVendorsForModal() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('vendors')
+      .select('name, representative, phone, id')
+      .order('name', { ascending: true });
+    
+    if (error) throw error;
+    
+    // Populate edit vendor dropdown
+    const editSelect = document.getElementById('vendorToEdit');
+    editSelect.innerHTML = '<option value="">Select vendor to edit...</option>';
+    if (data) {
+      data.forEach(v => {
+        const option = document.createElement('option');
+        option.value = v.id;
+        option.textContent = v.name;
+        editSelect.appendChild(option);
+      });
+      
+      // Show existing vendors list
+      const vendorsList = document.getElementById('existingVendorsList');
+      vendorsList.innerHTML = data.map(v => `
+        <div class="flex justify-between items-center p-2 border-b border-slate-100 text-sm">
+          <span>${v.name}</span>
+          <span class="text-slate-500">${v.representative || '—'} • ${v.phone || '—'}</span>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.error('Error loading vendors for modal:', err);
+    showToast('Error loading vendors: ' + err.message, 'error');
+  }
+}
+
+async function addNewVendor() {
+  const name = document.getElementById('newVendorName').value.trim();
+  const representative = document.getElementById('newRepName').value.trim();
+  const phone = document.getElementById('newPhone').value.trim();
+  
+  if (!name) {
+    showToast('Vendor name is required', 'error');
+    return;
+  }
+  
+  try {
+    const { error } = await supabaseClient
+      .from('vendors')
+      .insert([{ name, representative, phone, is_active: true }]);
+    
+    if (error) throw error;
+    
+    showToast(`Vendor "${name}" added successfully!`);
+    
+    // Clear form
+    document.getElementById('newVendorName').value = '';
+    document.getElementById('newRepName').value = '';
+    document.getElementById('newPhone').value = '';
+    
+    // Reload vendors
+    loadVendorsFromSupabase();
+    loadExistingVendorsForModal();
+  } catch (err) {
+    showToast('Error adding vendor: ' + err.message, 'error');
+  }
+}
+
+async function editVendor() {
+  const vendorId = document.getElementById('vendorToEdit').value;
+  const name = document.getElementById('newVendorNameEdit').value.trim();
+  const representative = document.getElementById('newRepNameEdit').value.trim();
+  const phone = document.getElementById('newPhoneEdit').value.trim();
+  
+  if (!vendorId) {
+    showToast('Please select a vendor to edit', 'error');
+    return;
+  }
+  
+  try {
+    const { error } = await supabaseClient
+      .from('vendors')
+      .update({ name, representative, phone })
+      .eq('id', vendorId);
+    
+    if (error) throw error;
+    
+    showToast(`Vendor updated successfully!`);
+    
+    // Clear form
+    document.getElementById('vendorToEdit').value = '';
+    document.getElementById('newVendorNameEdit').value = '';
+    document.getElementById('newRepNameEdit').value = '';
+    document.getElementById('newPhoneEdit').value = '';
+    
+    // Reload vendors
+    loadVendorsFromSupabase();
+    loadExistingVendorsForModal();
+  } catch (err) {
+    showToast('Error updating vendor: ' + err.message, 'error');
+  }
+}
+
+async function deleteVendor() {
+  const vendorId = document.getElementById('vendorToEdit').value;
+  
+  if (!vendorId) {
+    showToast('Please select a vendor to delete', 'error');
+    return;
+  }
+  
+  if (!confirm('Are you sure you want to delete this vendor?')) return;
+  
+  try {
+    const { error } = await supabaseClient
+      .from('vendors')
+      .delete()
+      .eq('id', vendorId);
+    
+    if (error) throw error;
+    
+    showToast('Vendor deleted successfully!');
+    
+    // Clear form
+    document.getElementById('vendorToEdit').value = '';
+    document.getElementById('newVendorNameEdit').value = '';
+    document.getElementById('newRepNameEdit').value = '';
+    document.getElementById('newPhoneEdit').value = '';
+    
+    // Reload vendors
+    loadVendorsFromSupabase();
+    loadExistingVendorsForModal();
+  } catch (err) {
+    showToast('Error deleting vendor: ' + err.message, 'error');
+  }
+}
+
 </script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>C-Store Daily Sales Tracker</title>
 
-<!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com"></script>
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<!-- SheetJS -->
-<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<!-- Supabase JS v2 -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- ============ VENDOR MANAGEMENT MODAL ============ -->
+  <div id="vendorModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
+      <h3 class="text-xl font-bold text-slate-800 mb-2">Manage Vendors</h3>
+      <p class="text-slate-500 mb-4">Add, edit, or delete vendors (name, representative, phone)</p>
+      
+      <div class="space-y-4">
+        <div>
+          <h4 class="text-sm font-medium text-slate-600 mb-2">Add New Vendor</h4>
+          <div class="grid grid-cols-2 gap-4">
+            <input type="text" id="newVendorName" placeholder="Vendor name" class="field-input w-full" />
+            <input type="text" id="newRepName" placeholder="Representative" class="field-input w-full" />
+            <input type="text" id="newPhone" placeholder="Phone" class="field-input w-full" />
+          </div>
+        </div>
+        
+        <div>
+          <h4 class="text-sm font-medium text-slate-600 mb-2">Edit Existing Vendor</h4>
+          <select id="vendorToEdit" class="field-input w-full mb-2"></select>
+          <div class="grid grid-cols-2 gap-4">
+            <input type="text" id="newVendorNameEdit" placeholder="New vendor name" class="field-input w-full" />
+            <input type="text" id="newRepNameEdit" placeholder="New representative" class="field-input w-full" />
+            <input type="text" id="newPhoneEdit" placeholder="New phone" class="field-input w-full" />
+          </div>
+          <button type="button" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm" onclick="editVendor()">Save Changes</button>
+        </div>
+        
+        <div>
+          <h4 class="text-sm font-medium text-slate-600 mb-2">Delete Vendor</h4>
+          <button type="button" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="deleteVendor()">Delete Selected Vendor</button>
+        </div>
+        
+        <div id="existingVendorsList" class="space-y-2 max-h-32 overflow-y-auto p-2 bg-slate-50 rounded border border-slate-100">
+          <span class="text-slate-400 text-sm">Loading vendors...</span>
+        </div>
+      </div>
+      
+      <div class="flex gap-3 mt-6">
+        <button type="button" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded text-sm" onclick="closeVendorModal()">Cancel</button>
+        <button type="button" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded font-semibold text-sm" onclick="addNewVendor()">Add Vendor</button>
+      </div>
+    </div>
+  </div>
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-  :root { --form-w: 680px; --gap-col: 12px; }
-
-  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-  .card { background:#fff; border:1px solid #e2e8f0; border-radius:0.75rem; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -1px rgba(0,0,0,0.04); }
-  .section-title { background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:#fff; padding:0.5rem 1rem; border-radius:0.375rem 0.375rem 0 0; font-weight:600; letter-spacing:0.02em; }
-  input[type="text"], input[type="number"], input[type="date"], textarea, select {
-    border:1px solid #cbd5e1; border-radius:0.5rem; padding:0.5rem 0.75rem; width:100%; font-variant-numeric: tabular-nums;
-  }
-  input:focus, textarea:focus, select:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.15); }
-  .toast { position:fixed; top:1rem; right:1rem; z-index:50; }
-
-  /* ---- Daily Report Form (POS style) ---- */
-  .field-label { display:block; font-size:0.68rem; font-weight:700; letter-spacing:0.04em; color:#64748b; text-transform:uppercase; margin-bottom:0.25rem; }
-  .field-wrap { position:relative; }
-  .field-wrap .dollar-prefix { position:absolute; left:0.7rem; top:50%; transform:translateY(-50%); color:#94a3b8; pointer-events:none; font-size:0.9rem; }
-  .field-wrap input.field-input { padding-left:1.6rem !important; }
-  input.field-input { border:1px solid #cbd5e1; border-radius:0.5rem; padding:0.5rem 0.7rem; width:100%; }
-  input.field-readonly { background:#f1f5f9 !important; font-weight:700; color:#1e293b; }
-
-  .pos-section-header {
-    display:flex; align-items:center;
-    font-size:0.74rem; font-weight:700; letter-spacing:0.055em; color:#1e293b;
-    text-transform:uppercase; padding-bottom:0.3rem;
-    border-bottom:1px solid #e2e8f0; margin-bottom:0.5rem;
-  }
-  .pos-section-header .num {
-    display:inline-flex; align-items:center; justify-content:center;
-    min-width:1.15rem; height:1.15rem; padding:0 0.25rem; margin-right:0.45rem;
-    border-radius:0.3rem; background:#e2e8f0; color:#334155;
-    font-size:0.6rem; font-weight:800; letter-spacing:0;
-  }
-
-  /* ---- Shared column grid: Lottery/Lotto + Sales/Settlements + Cash ---- */
-  .form-3col {
-    display:grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px var(--gap-col);
-    max-width: var(--form-w);
-  }
-  .col-header {
-    font-size:0.66rem; font-weight:800; letter-spacing:0.07em; color:#334155;
-    text-transform:uppercase; padding-bottom:0.25rem;
-    border-bottom:1px dashed #e2e8f0; margin-bottom:0.1rem;
-  }
-
-  /* ---- Totals strip ---- */
-  .totals-strip {
-    display:grid;
-    grid-template-columns: repeat(3, minmax(0,1fr));
-    gap: var(--gap-col);
-    max-width: var(--form-w);
-  }
-  .total-chip {
-    background:#0f172a; color:#fff; border-radius:0.5rem;
-    padding:0.5rem 0.8rem; display:flex; flex-direction:column; gap:0.1rem;
-    border:1px solid #0f172a;
-  }
-  .total-chip .tc-label { font-size:0.58rem; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; opacity:0.72; }
-  .total-chip .tc-value { font-size:1rem; font-weight:700; font-variant-numeric:tabular-nums; line-height:1.25; }
-  .total-chip.is-light { background:#fff; border-color:#e2e8f0; }
-  .total-chip.is-light .tc-label { color:#64748b; opacity:1; }
-
-  /* ---- Purchase rows ---- */
-  .purchase-row-label { font-size:0.64rem; font-weight:700; letter-spacing:0.05em; color:#64748b; text-transform:uppercase; margin-bottom:0.2rem; }
-  .purchase-row-grid {
-    display:grid;
-    grid-template-columns: minmax(0,1fr) 150px 24px;
-    align-items:center; gap:10px;
-    max-width: 480px;
-  }
-  input.vendor-field { max-width:none; }
-
-  /* Hide native number input spinners so no floating icons sit inside fields */
-  input[type="number"]::-webkit-inner-spin-button,
-  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
-  input[type="number"] { -moz-appearance:textfield; }
-
-  @media (max-width: 720px) {
-    .form-3col, .totals-strip { grid-template-columns: minmax(0,1fr); }
-  }
-  @media (max-width: 480px) {
-    .purchase-row-grid { grid-template-columns: minmax(0,1fr) 110px 24px; }
-  }
-</style>
 </body>
 </html>
