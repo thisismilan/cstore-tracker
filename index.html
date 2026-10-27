@@ -7,6 +7,8 @@
 
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com"></script>
+<!-- Font Awesome for professional icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-ieTl2+6Qj+3JQHvlSqmwu6xRzXWUuU4P3J6I2Ha2pF/R2uIc0zlZ4XBwFcK/8pI7Jf6pC6gQpsqTgr8zQeH9aw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <!-- SheetJS -->
@@ -15,30 +17,220 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
+  :root {
+    --primary: #1d4ed8;
+    --primary-hover: #1e40af;
+    --success: #1d4ed8;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --surface: #ffffff;
+    --bg: #f1f5f9;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+  }
   body { font-family: 'Segoe UI', Arial, sans-serif; }
-  .card { background:#fff; border:1px solid #e2e8f0; border-radius:0.5rem; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:0.75rem; box-shadow:0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04); }
   .section-title { background:#0f172a; color:#fff; padding:0.5rem 1rem; border-radius:0.375rem 0.375rem 0 0; font-weight:600; letter-spacing:0.02em; }
   input[type="text"], input[type="number"], input[type="date"], textarea, select {
     border:1px solid #cbd5e1; border-radius:0.375rem; padding:0.4rem 0.6rem; width:100%;
   }
-  input:focus, textarea:focus, select:focus { outline:2px solid #1d4ed8; outline-offset:1px; }
+  input:focus, textarea:focus, select:focus { outline:2px solid var(--primary); outline-offset:1px; }
   .toast { position:fixed; top:1rem; right:1rem; z-index:50; }
 
   /* ---- Daily Report Form (POS style) ---- */
-  .field-label { display:block; font-size:0.7rem; font-weight:700; letter-spacing:0.04em; color:#64748b; text-transform:uppercase; margin-bottom:0.35rem; }
+  .field-label { display:block; font-size:0.7rem; font-weight:700; letter-spacing:0.04em; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.35rem; }
   .field-wrap { position:relative; }
   .field-wrap .dollar-prefix { position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); color:#94a3b8; pointer-events:none; }
   .field-wrap input.field-input { padding-left:1.75rem !important; }
   .field-wrap .diff-suffix { position:absolute; right:0.9rem; top:50%; transform:translateY(-50%); color:#cbd5e1; font-weight:700; pointer-events:none; }
   input.field-input { border:1px solid #cbd5e1; border-radius:0.5rem; padding:0.6rem 0.75rem; width:100%; }
-  input.field-readonly { background:#f1f5f9 !important; font-weight:700; color:#1e293b; }
-  .pos-section-header { font-size:0.8rem; font-weight:700; letter-spacing:0.05em; color:#1e293b; text-transform:uppercase; padding-bottom:0.5rem; border-bottom:1px solid #e2e8f0; margin-bottom:1.25rem; }
+  input.field-readonly { background:#f1f5f9 !important; font-weight:700; color:var(--text); }
+  .pos-section-header { font-size:0.8rem; font-weight:700; letter-spacing:0.05em; color:var(--text); text-transform:uppercase; padding-bottom:0.5rem; border-bottom:1px solid var(--border); margin-bottom:1.25rem; }
   .pos-section-header .num { color:#64748b; margin-right:0.4rem; }
   .grand-total-bar { background:#0f172a; color:#fff; border-radius:0.5rem; padding:0.9rem 1.1rem; display:flex; align-items:center; justify-content:space-between; }
   .grand-total-bar .gt-label { font-size:0.7rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; opacity:0.8; }
   .grand-total-bar .gt-value { font-size:1.25rem; font-weight:700; }
   .overshort-box { background:#fff; border:1px solid #e2e8f0; border-radius:0.5rem; padding:1rem 1.25rem; display:flex; align-items:center; justify-content:space-between; }
-  .purchase-row-label { font-size:0.7rem; font-weight:700; letter-spacing:0.04em; color:#64748b; text-transform:uppercase; margin-bottom:0.35rem; }
+  .purchase-row-label { font-size:0.7rem; font-weight:700; letter-spacing:0.04em; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.35rem; }
+
+  /* ---- Report UI: clean blue, high-contrast POS layout ---- */
+  body { background:var(--bg); color:var(--text); }
+  #topNav { background:#0b1f3a; border-bottom:3px solid var(--primary); }
+  #employeeView { max-width: 1120px; }
+  .report-heading { display:flex; align-items:center; gap:1rem; padding:0.5rem 0 1rem; }
+  .report-heading::before { content:"▤"; display:grid; place-items:center; flex:0 0 3.25rem; height:3.25rem; border-radius:0.65rem; background:#dbeafe; color:#1e40af; font-size:1.65rem; font-weight:700; }
+  .report-heading h2 { color:#0b2942; font-size:1.65rem; line-height:1.2; }
+  .report-heading p { margin-top:0.35rem; color:#475569; font-size:0.95rem; }
+  .report-heading > div { min-width:0; }
+  .report-topline { display:flex; align-items:center; justify-content:space-between; gap:1.25rem; padding:.5rem 1.15rem 1rem; margin-bottom:.5rem; background:#fff; border:1px solid #cbdcf0; border-radius:.65rem; box-shadow:0 2px 7px rgba(15,45,75,.05); }
+  .report-date-control { width:min(100%, 17rem); flex:0 0 min(100%, 17rem); }
+  .report-date-control .field-label { color:#244661; text-transform:none; letter-spacing:0; font-size:.8rem; }
+  .report-date-control input { background:#fff; }
+  .report-edit-notice { border:1px solid #bfdbfe; background:#eff6ff; color:#1e3a8a; border-radius:.5rem; padding:.7rem 1rem; font-size:.875rem; }
+  .report-section + .report-section { margin-top:0; }
+  .report-sales-columns > div:first-child { border-right:1px solid #dbe6f2; padding-right:1.5rem; }
+  #actualLottoLottery { background:#eff6ff !important; }
+  #dailyReportForm #overShort { color:#102a43; }
+  #dailyReportForm #overShort.text-red-600 { color:#b91c1c !important; }
+  #dailyReportForm #overShort.text-blue-700 { color:#1d4ed8 !important; }
+  .report-footer-note { color:#475569; }
+  #dailyReportForm { padding:0; background:transparent; border:0; box-shadow:none; }
+  .report-section { padding:1.1rem 1.15rem; background:#fff; border:1px solid #cbdcf0; border-radius:0.65rem; box-shadow:0 2px 8px rgba(15,45,75,.05); }
+  .pos-section-header { display:flex; align-items:center; min-height:2.1rem; margin-bottom:1rem; padding:0 0 .8rem; border-bottom:1px solid #dbe6f2; color:#123451; font-size:1rem; letter-spacing:0; }
+  .pos-section-header::after { content:"⌄"; margin-left:auto; color:#355875; font-size:1.1rem; }
+  .report-section.collapsible .pos-section-header { cursor:pointer; user-select:none; }
+  .report-section.collapsible .section-content { display:block; }
+  .report-section.collapsible.is-collapsed .section-content { display:none; }
+  .report-section.collapsible .pos-section-header:focus-visible { outline:2px solid #1d4ed8; outline-offset:3px; border-radius:.25rem; }
+  .report-section.collapsible.is-collapsed .pos-section-header::after { content:"›"; transform:rotate(90deg); }
+  .pos-section-header .num { display:grid; place-items:center; width:1.8rem; height:1.8rem; margin-right:.65rem; border-radius:50%; background:#123b63; color:#fff; font-size:.85rem; }
+  .field-label,.purchase-row-label { color:#355875; font-size:.74rem; letter-spacing:.025em; }
+  input.field-input, textarea.field-input, select.field-input { min-height:2.75rem; border-color:#c7d7e8; border-radius:.45rem; background:#fff; color:#102a43; }
+  input.field-input:focus, textarea.field-input:focus, select.field-input:focus { outline:2px solid #1d4ed8; outline-offset:1px; border-color:#1d4ed8; }
+  input.field-readonly { background:#eff5fb !important; color:#173b5e; }
+  input.field-readonly.negative-value { color:#b91c1c !important; font-weight:700; }
+  .field-wrap .dollar-prefix { color:#56738d; }
+  #dailyReportForm .grid.grid-cols-1.md\\:grid-cols-2.gap-8.mt-6 { gap:1rem; }
+  .grand-total-bar { min-height:3.5rem; padding:.85rem 1rem; background:#123b63; border-radius:.5rem; }
+  .grand-total-bar .gt-label { color:#fff; }
+  .overshort-box { border-color:#d7e3ef; background:#f8fbff; }
+  #overShort.text-red-600 { color:#b91c1c; }
+  #overShort.text-blue-700 { color:#1d4ed8; }
+  #addPurchaseRow { border-color:#1d4ed8; color:#1e40af; }
+  #addPurchaseRow:hover { background:#eff6ff; }
+  #dailyReportForm button[type="submit"], #stickySubmit button:first-child { background:#1d4ed8; }
+  #dailyReportForm button[type="submit"]:hover, #stickySubmit button:first-child:hover { background:#1e40af; }
+  #stickySubmit { padding-bottom:max(.75rem, env(safe-area-inset-bottom)); }
+  #stickySubmit button { min-height:2.75rem; }
+  #stickySubmit button:first-child { color:#fff; }
+
+  @media (max-width: 768px) {
+    #employeeView { padding:1rem .75rem 6rem; }
+    .report-heading { gap:.75rem; padding:.25rem 0 .75rem; }
+    .report-heading::before { flex-basis:2.75rem; height:2.75rem; font-size:1.35rem; }
+    .report-heading h2 { font-size:1.3rem; }
+    .report-heading p { font-size:.85rem; }
+    .report-topline { flex-direction:column; align-items:stretch; gap:.85rem; }
+    .report-date-control { width:100%; flex-basis:auto; }
+    .report-sales-columns > div:first-child { border-right:0; border-bottom:1px solid #dbe6f2; padding-right:0; padding-bottom:1rem; }
+    #dailyReportForm { padding:.6rem; }
+    .report-section { padding:.85rem; }
+    .pos-section-header { font-size:.9rem; }
+    #stickySubmit { flex-direction:column; gap:.5rem; }
+    #stickySubmit button { width:100%; }
+  }
+/* ---- Mobile tap targets ---- */
+  @media (max-width: 768px) {
+    button, .field-input, select, textarea {
+      min-height: 44px;
+      font-size: 16px;
+    }
+    .toast {
+      top: auto;
+      bottom: 1rem;
+      left: 1rem;
+      right: 1rem;
+      text-align: center;
+    }
+  }
+  
+  /* ---- Sticky submit bar ---- */
+  #stickySubmit {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 0.75rem 1rem;
+    z-index: 40;
+    transform: translateY(120%);
+    transition: transform 0.2s ease;
+    box-shadow: 0 -4px 6px -1px rgba(0,0,0,0.08);
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+  }
+  #stickySubmit.visible { transform: translateY(0); }
+  
+  /* ---- Empty states ---- */
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+  }
+
+  /* ---- Manager Analytics Dashboard: professional polish + mobile responsiveness ---- */
+  #managerView { padding-bottom:1.5rem; }
+  #managerView .analytics-header {
+    background: linear-gradient(180deg, rgba(29,78,216,0.10), rgba(15,23,42,0.04));
+    border:1px solid rgba(29,78,216,0.18);
+    border-radius:0.9rem;
+    padding:1.25rem;
+  }
+  #managerView .analytics-header h2 { font-size:1.6rem; }
+  #managerView .analytics-header p { color:#475569; margin-top:0.5rem; max-width:70ch; }
+
+  #managerView .analytics-summary {
+    display:grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap:0.75rem;
+  }
+  @media (min-width: 1024px) {
+    #managerView .analytics-summary { grid-template-columns: repeat(6, minmax(0,1fr)); }
+  }
+
+  #managerView .card.stat-card { 
+    border:1px solid rgba(226,232,240,1);
+    background:#fff;
+    border-radius:0.85rem;
+    padding:0.9rem 0.95rem;
+    box-shadow: 0 6px 18px rgba(2,6,23,0.04);
+    position:relative;
+    overflow:hidden;
+  }
+  #managerView .stat-card .stat-top { display:flex; align-items:center; gap:0.65rem; }
+  #managerView .stat-card .stat-icon {
+    width:34px; height:34px;
+    border-radius:0.65rem;
+    display:grid; place-items:center;
+    color:#fff;
+    font-weight:800;
+  }
+  #managerView .stat-card .stat-label {
+    font-size:0.75rem;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:#64748b;
+    font-weight:700;
+  }
+  #managerView .stat-card .stat-value { margin-top:0.25rem; font-size:1.125rem; font-weight:600; color:#0f172a; letter-spacing:-0.01em; }
+  #managerView .stat-card .stat-sub { margin-top:0.25rem; font-size:0.75rem; color:#64748b; }
+
+  #managerView .stat-change { color:#16a34a; }
+  #managerView .stat-change.text-red-600 { color:#dc2626 !important; }
+  #managerView .stat-change.text-green-600 { color:#16a34a !important; }
+
+  #managerView .analytics-controls {
+    display:flex;
+    gap:0.75rem;
+    flex-wrap:wrap;
+    align-items:flex-end;
+  }
+  #managerView .analytics-controls input[type="date"] { min-width:145px; }
+  #managerView .analytics-controls button { white-space:nowrap; }
+
+  #managerView .charts-wrap { gap:1rem; }
+
+  @media (max-width: 640px) {
+    #managerView { padding-left:0.85rem; padding-right:0.85rem; }
+    #managerView .analytics-controls { gap:0.5rem; }
+    #managerView .analytics-controls input[type="date"] { min-width:0; flex:1; }
+    #managerView .analytics-summary { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+  .empty-state .empty-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+  .empty-state p { margin-bottom: 0.25rem; }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -51,8 +243,8 @@
     </div>
     <div class="flex items-center gap-4">
       <span id="navUserInfo" class="text-sm text-slate-300"></span>
-      <span id="navRoleBadge" class="text-xs font-semibold px-2 py-1 rounded bg-blue-600 uppercase"></span>
-      <button id="vendorMgmtBtn" onclick="openVendorModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded hidden">Manage Vendors</button>
+      <span id="navRoleBadge" class="text-xs font-semibold px-2 py-1 rounded bg-indigo-600 uppercase"></span>
+      <button id="vendorMgmtBtn" onclick="openVendorView()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded hidden">Manage Vendors</button>
       <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded">Logout</button>
     </div>
   </div>
@@ -95,20 +287,40 @@
 
 <!-- ============ EMPLOYEE VIEW ============ -->
 <div id="employeeView" class="hidden max-w-5xl mx-auto px-4 py-6 space-y-6">
-  <h2 class="text-2xl font-bold text-slate-800">Daily Report Entry Form</h2>
+  <header class="report-heading report-topline">
+    <div>
+      <h2 class="text-2xl font-bold">Daily Report Entry Form</h2>
+      <p>Record your store's sales, lottery, and settlement information.</p>
+    </div>
+    <div class="report-date-control">
+      <label class="field-label" for="reportDate">Date</label>
+      <input type="date" id="reportDate" form="dailyReportForm" required class="field-input" />
+      <span id="reportDayOfWeek" class="block text-slate-600 text-sm mt-2"></span>
+    </div>
+  </header>
 
-  <form id="dailyReportForm" class="card p-6 space-y-8">
-    <div class="flex flex-wrap items-end gap-4 pb-2">
-      <div class="max-w-xs">
-        <label class="field-label">Date</label>
-        <input type="date" id="reportDate" required class="field-input" />
-      </div>
-      <span id="reportDayOfWeek" class="text-slate-500 text-sm pb-2"></span>
+  <form id="dailyReportForm" class="card p-6 space-y-5">
+    <div id="existingEntryDot" class="hidden report-edit-notice">
+      <span class="w-3 h-3 bg-blue-700 rounded-full inline-block mr-2"></span>
+      <span class="text-blue-800">Editing existing report — changes will update the saved record.</span>
+    </div>
+
+    <!-- Edit Mode Indicator -->
+    <div id="editModeIndicator" class="hidden report-edit-notice mb-4">
+      Saving changes to this existing report…
+    </div>
+
+    <!-- Back to Dashboard Button (Manager only, shown when opened from dashboard) -->
+    <div id="backToDashboardBtn" class="hidden mb-4">
+      <button type="button" onclick="backToDashboard()" class="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded flex items-center gap-2">
+        ← Back to Dashboard
+      </button>
     </div>
 
     <!-- SECTION 01 -->
-    <div>
-      <div class="pos-section-header"><span class="num">01</span>Lottery &amp; Lotto</div>
+    <div class="report-section collapsible">
+      <div class="pos-section-header" role="button" tabindex="0"><span class="num">1</span>Lottery &amp; Lotto</div>
+      <div class="section-content">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
           <label class="field-label">Lottery Ring</label>
@@ -157,12 +369,14 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
 
     <!-- SECTION 02 -->
-    <div>
-      <div class="pos-section-header"><span class="num">02</span>Sales &amp; Settlements</div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <div class="report-section collapsible">
+      <div class="pos-section-header" role="button" tabindex="0"><span class="num">2</span>Sales &amp; Settlements</div>
+      <div class="section-content">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 report-sales-columns">
         <!-- SALES COLUMN -->
         <div class="space-y-4">
           <h4 class="text-xs font-bold tracking-wide text-slate-800 uppercase">Sales</h4>
@@ -242,21 +456,23 @@
       </div>
 
       <!-- OVER / SHORT -->
-      <div class="overshort-box mt-6">
+      <div class="report-section overshort-box mt-6">
         <div class="flex items-center gap-3">
           <span class="text-2xl">⚖️</span>
           <div>
-            <div class="text-xs font-bold tracking-wide text-slate-500 uppercase">Over / Short</div>
-            <div class="text-sm text-slate-400">Enter figures</div>
+        <div class="text-xs font-bold tracking-wide text-slate-700 uppercase">Over / Short</div>
+        <div class="text-sm text-slate-600">Enter figures</div>
           </div>
         </div>
         <div id="overShort" class="text-2xl font-bold text-slate-800">$0.00</div>
       </div>
+      </div>
     </div>
 
     <!-- SECTION 03 -->
-    <div>
-      <div class="pos-section-header"><span class="num">03</span>Inventory Purchases</div>
+    <div class="report-section collapsible">
+      <div class="pos-section-header" role="button" tabindex="0"><span class="num">3</span>Inventory Purchases</div>
+      <div class="section-content">
       <div id="purchaseRows" class="space-y-4"></div>
       <div class="flex items-center justify-between mt-4">
         <button type="button" id="addPurchaseRow" class="border border-slate-300 hover:bg-slate-50 text-slate-800 text-sm font-semibold px-4 py-2 rounded flex items-center gap-1">
@@ -264,29 +480,46 @@
         </button>
         <span class="text-sm text-slate-700">Total <span class="font-bold text-slate-900">$<span id="purchasesTotal">0.00</span></span></span>
       </div>
+      </div>
     </div>
 
     <!-- SECTION 04 -->
-    <div>
-      <div class="pos-section-header"><span class="num">04</span>Shift Notes</div>
-      <textarea id="shiftNotes" rows="4" placeholder="Enter any comments about the shift..." class="field-input"></textarea>
+    <div class="report-section collapsible">
+      <div class="pos-section-header" role="button" tabindex="0"><span class="num">4</span>Shift Notes</div>
+      <div class="section-content">
+        <textarea id="shiftNotes" rows="4" placeholder="Enter any comments about the shift..." class="field-input"></textarea>
+      </div>
     </div>
 
     <div>
-      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold tracking-wide uppercase text-sm py-4 rounded shadow">
+      <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold tracking-wide uppercase text-sm py-4 rounded shadow">
         Submit Daily Report
       </button>
-      <p class="text-center text-xs text-slate-400 mt-3">Entries are saved securely. Past reports are not visible on this screen.</p>
+      <p class="report-footer-note text-center text-xs mt-3">Entries are saved securely. Past reports are not visible on this screen.</p>
     </div>
   </form>
+
+  <!-- Sticky Submit Bar (shown when scrolled) -->
+  <div id="stickySubmit" class="hidden">
+    <button type="button" onclick="document.getElementById('dailyReportForm').requestSubmit()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold tracking-wide uppercase text-sm py-4 px-6 rounded shadow w-full sm:w-auto">
+      Submit Daily Report
+    </button>
+    <button type="button" onclick="backToDashboard()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold text-sm py-4 px-6 rounded w-full sm:w-auto">
+      ← Back to Dashboard
+    </button>
+  </div>
+
 </div>
 
 <!-- ============ MANAGER VIEW ============ -->
 <div id="managerView" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
-  <h2 class="text-2xl font-bold text-slate-800">Analytics Dashboard</h2>
+  <div class="analytics-header">
+    <h2 class="text-2xl font-bold text-slate-800">Analytics Dashboard</h2>
+    <p>Track your sales, inventory and performance at a glance.</p>
+  </div>
 
   <!-- Filters -->
-  <div class="card p-4 flex flex-wrap items-end gap-4">
+  <div class="card p-4 analytics-controls flex flex-wrap items-end gap-4">
     <div>
       <label class="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
       <input type="date" id="filterStart" />
@@ -295,36 +528,84 @@
       <label class="block text-sm font-medium text-slate-700 mb-1">End Date</label>
       <input type="date" id="filterEnd" />
     </div>
-    <button id="applyFilterBtn" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded font-semibold">Apply</button>
-    <button id="exportExcelBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold">Export to Excel</button>
+    <button id="applyFilterBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-semibold">Apply</button>
+    <button id="exportExcelBtn" class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold">Export to Excel</button>
   </div>
 
   <!-- Summary cards -->
-  <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
-    <div class="card p-4 text-center">
-      <div class="text-xs text-slate-500 uppercase">Total Sales</div>
-      <div id="sumTotalSales" class="text-xl font-bold text-slate-800">$0.00</div>
+  <div class="analytics-summary">
+    <div class="card p-4 text-center stat-card">
+      <div class="stat-top" style="justify-content:center;">
+        <div class="stat-icon" style="background:#1d4ed8; color:#fff; font-size:1.2rem;">
+          <i class="fa-solid fa-shopping-bag"></i>
+        </div>
+        <div class="stat-label">Total Sales</div>
+      </div>
+      <div class="flex items-baseline justify-center gap-2">
+        <div id="sumTotalSales" class="stat-value">$0.00</div>
+        <div id="sumTotalSalesChange" class="stat-change text-sm font-bold"></div>
+      </div>
     </div>
-    <div class="card p-4 text-center">
-      <div class="text-xs text-slate-500 uppercase">Total Over/Short</div>
-      <div id="sumOverShort" class="text-xl font-bold text-slate-800">$0.00</div>
+    <div class="card p-4 text-center stat-card">
+      <div class="stat-top" style="justify-content:center;">
+        <div class="stat-icon" style="background:#ef4444; color:#fff; font-size:1.2rem;">
+          <i class="fa-solid fa-scale-balanced"></i>
+        </div>
+        <div class="stat-label">Total Over/Short</div>
+      </div>
+      <div class="flex items-baseline justify-center gap-2">
+        <div id="sumOverShort" class="stat-value">$0.00</div>
+        <div id="sumOverShortChange" class="stat-change text-sm font-bold"></div>
+      </div>
     </div>
-    <div class="card p-4 text-center">
-      <div class="text-xs text-slate-500 uppercase">Total Purchases</div>
-      <div id="sumPurchases" class="text-xl font-bold text-slate-800">$0.00</div>
+    <div class="card p-4 text-center stat-card">
+      <div class="stat-top" style="justify-content:center;">
+        <div class="stat-icon" style="background:#2563eb; color:#fff; font-size:1.2rem;">
+          <i class="fa-solid fa-shopping-cart"></i>
+        </div>
+        <div class="stat-label">Total Purchases</div>
+      </div>
+      <div class="flex items-baseline justify-center gap-2">
+        <div id="sumPurchases" class="stat-value">$0.00</div>
+        <div id="sumPurchasesChange" class="stat-change text-sm font-bold"></div>
+      </div>
     </div>
-    <div class="card p-4 text-center">
-      <div class="text-xs text-slate-500 uppercase">Current Inventory</div>
-      <div id="sumCurrentInventory" class="text-xl font-bold text-slate-800">$0.00</div>
+    <div class="card p-4 text-center stat-card">
+      <div class="stat-top" style="justify-content:center;">
+        <div class="stat-icon" style="background:#16a34a; color:#fff; font-size:1.2rem;">
+          <i class="fa-solid fa-store"></i>
+        </div>
+        <div class="stat-label">Current Inventory</div>
+      </div>
+      <div class="flex items-baseline justify-center gap-2">
+        <div id="sumCurrentInventory" class="stat-value">$0.00</div>
+        <div id="sumCurrentInventoryChange" class="stat-change text-sm font-bold"></div>
+      </div>
       <div class="text-xs text-slate-500">($100k base + retail purchases - sales)</div>
     </div>
-    <div class="card p-4 text-center">
-      <div class="text-xs text-slate-500 uppercase">Avg Daily Sales</div>
-      <div id="sumAvgSales" class="text-xl font-bold text-slate-800">$0.00</div>
+    <div class="card p-4 text-center stat-card">
+      <div class="stat-top" style="justify-content:center;">
+        <div class="stat-icon" style="background:#9333ea; color:#fff; font-size:1.2rem;">
+          <i class="fa-solid fa-chart-line"></i>
+        </div>
+        <div class="stat-label">Avg Daily Sales</div>
+      </div>
+      <div class="flex items-baseline justify-center gap-2">
+        <div id="sumAvgSales" class="stat-value">$0.00</div>
+        <div id="sumAvgSalesChange" class="stat-change text-sm font-bold"></div>
+      </div>
     </div>
-    <div class="card p-4 text-center">
-      <div class="text-xs text-slate-500 uppercase">Reports</div>
-      <div id="sumCount" class="text-xl font-bold text-slate-800">0</div>
+    <div class="card p-4 text-center stat-card">
+      <div class="stat-top" style="justify-content:center;">
+        <div class="stat-icon" style="background:#475569; color:#fff; font-size:1.2rem;">
+          <i class="fa-solid fa-clipboard"></i>
+        </div>
+        <div class="stat-label">Reports</div>
+      </div>
+      <div class="flex items-baseline justify-center gap-2">
+        <div id="sumCount" class="stat-value">0</div>
+        <div id="sumCountChange" class="stat-change text-sm font-bold"></div>
+      </div>
     </div>
   </div>
 
@@ -385,10 +666,63 @@
           <th class="py-2 pr-4">Over/Short</th>
           <th class="py-2 pr-4">Purchases Total</th>
           <th class="py-2 pr-4">Notes</th>
+          <th class="py-2 pr-4">Actions</th>
         </tr>
       </thead>
       <tbody id="reportsTableBody"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- ============ VENDOR MANAGEMENT VIEW ============ -->
+<div id="vendorView" class="hidden max-w-5xl mx-auto px-4 py-6 space-y-6">
+  <div class="flex items-center justify-between">
+    <h2 class="text-2xl font-bold text-slate-800">Vendor Management</h2>
+    <button type="button" onclick="backToMainView()" class="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded flex items-center gap-2">
+      ← Back to Dashboard
+    </button>
+  </div>
+
+  <!-- Add/Edit Vendor Form -->
+  <div class="card p-6">
+    <h3 class="text-lg font-semibold text-slate-800 mb-4" id="vendorFormTitle">Add New Vendor</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Vendor Name</label>
+        <input type="text" id="vendorName" placeholder="e.g. Coca-Cola" class="field-input w-full" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Representative Name</label>
+        <input type="text" id="vendorRep" placeholder="e.g. John Smith" class="field-input w-full" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+        <input type="text" id="vendorPhone" placeholder="e.g. 555-1234" class="field-input w-full" />
+      </div>
+    </div>
+    <button type="button" onclick="addVendor()" class="mt-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded">
+      + Add Vendor
+    </button>
+  </div>
+
+  <!-- Vendor List -->
+  <div class="card p-6">
+    <h3 class="text-lg font-semibold text-slate-800 mb-4">All Vendors</h3>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left border-b border-slate-300 text-slate-600">
+            <th class="py-2 pr-4">Vendor Name</th>
+            <th class="py-2 pr-4">Representative</th>
+            <th class="py-2 pr-4">Phone</th>
+            <th class="py-2 pr-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="vendorsTableBody">
+          <tr><td colspan="4" class="text-center text-slate-400 py-4">Loading vendors...</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -400,6 +734,10 @@ const SUPABASE_URL = "https://ziqnwfawmhbpldpsadzt.supabase.co";
 const SUPABASE_KEY = "sb_publishable_qrYg2_WD_PL-3kMk_EOyGw_kITVMCxg";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const TABLE_NAME = "daily_reports";
+let currentEditingId = null;
+let cameFromManager = false;
+let currentReports = [];
+let calYear, calMonth;
 
 /* =========================================================
    TOAST HELPER
@@ -408,7 +746,7 @@ function showToast(message, type = "success") {
   const toast = document.getElementById("toast");
   toast.textContent = message;
   toast.className = "toast px-4 py-3 rounded shadow-lg text-white font-medium " +
-    (type === "success" ? "bg-green-600" : "bg-red-600");
+    (type === "success" ? "bg-blue-700" : "bg-rose-700");
   toast.classList.remove("hidden");
   setTimeout(() => toast.classList.add("hidden"), 3500);
 }
@@ -420,6 +758,7 @@ const loginScreen = document.getElementById("loginScreen");
 const topNav = document.getElementById("topNav");
 const employeeView = document.getElementById("employeeView");
 const managerView = document.getElementById("managerView");
+const vendorView = document.getElementById("vendorView");
 const navUserInfo = document.getElementById("navUserInfo");
 const navRoleBadge = document.getElementById("navRoleBadge");
 
@@ -448,6 +787,7 @@ function applySession(name, role) {
   navRoleBadge.textContent = role;
   loginScreen.classList.add("hidden");
   topNav.classList.remove("hidden");
+  vendorView.classList.add("hidden"); // Hide vendor view on login
 
   // Show Manage Vendors button for employee and manager
   const vendorMgmtBtn = document.getElementById("vendorMgmtBtn");
@@ -459,21 +799,29 @@ function applySession(name, role) {
     vendorMgmtBtn.classList.add("hidden");
   }
 
-  if (role === "employee") {
-    employeeView.classList.remove("hidden");
-    managerView.classList.add("hidden");
-    document.getElementById("reportDate").valueAsDate = new Date();
-    updateReportDayOfWeek();
-  } else {
+  if (role === "manager") {
     managerView.classList.remove("hidden");
     employeeView.classList.add("hidden");
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     document.getElementById("filterStart").valueAsDate = firstDayOfMonth;
     document.getElementById("filterEnd").valueAsDate = today;
-    loadDashboardData();
+    console.log("Manager login - calling loadDashboardData");
+    loadDashboardData().catch(err => console.error("loadDashboardData failed:", err));
     renderCalendar();
+  } else if (role === "employee") {
+    employeeView.classList.remove("hidden");
+    managerView.classList.add("hidden");
+    // Set default date to yesterday for employees
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    document.getElementById("reportDate").valueAsDate = yesterday;
+    updateReportDayOfWeek();
+    // Check if entry exists for yesterday and load it for editing
+    checkAndLoadEntryForDate(yesterday.toISOString().split("T")[0]);
   }
+  // Update back button visibility based on role
+  updateBackButtonVisibility();
 }
 
 document.getElementById("loginForm").addEventListener("submit", (e) => {
@@ -515,7 +863,145 @@ function updateReportDayOfWeek() {
   const d = new Date(dateInput.value + "T00:00:00");
   dayEl.textContent = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "2-digit", year: "numeric" });
 }
-document.getElementById("reportDate").addEventListener("change", updateReportDayOfWeek);
+document.getElementById("reportDate").addEventListener("change", (e) => {
+  updateReportDayOfWeek();
+  checkAndLoadEntryForDate(e.target.value);
+});
+
+/* =========================================================
+   SHOW BACK TO DASHBOARD BUTTON IN EMPLOYEE VIEW
+   ========================================================= */
+function updateBackButtonVisibility() {
+  const session = JSON.parse(sessionStorage.getItem("cstore_user") || "{}");
+  const backBtn = document.getElementById("backToDashboardBtn");
+  if (session.role === "manager") {
+    backBtn.classList.remove("hidden");
+  } else {
+    backBtn.classList.add("hidden");
+  }
+}
+
+/* =========================================================
+   CHECK AND LOAD ENTRY FOR EDITING
+   ========================================================= */
+async function checkAndLoadEntryForDate(dateStr) {
+  if (!dateStr) return;
+  
+  const session = JSON.parse(sessionStorage.getItem("cstore_user") || "{}");
+  if (session.role !== "employee" && session.role !== "manager") return;
+  
+  try {
+    const { data, error } = await supabaseClient
+      .from(TABLE_NAME)
+      .select("*")
+      .eq("date", dateStr)
+      .single();
+    
+    if (error && error.code !== "PGRST116") {
+      console.error("Error checking entry:", error);
+      return;
+    }
+    
+    if (data) {
+      loadEntryForEdit(data);
+    } else {
+      clearEditState();
+    }
+  } catch (err) {
+    console.error("Error checking entry:", err);
+  }
+}
+
+function loadEntryForEdit(report) {
+  // Populate form with existing data
+  document.getElementById("reportDate").value = report.date;
+  document.getElementById("lotteryRing").value = parseFloat(report.lottery_ring) || 0;
+  document.getElementById("lotteryActual").value = parseFloat(report.lottery_actual) || 0;
+  document.getElementById("lottoRing").value = parseFloat(report.lotto_ring) || 0;
+  document.getElementById("lottoActual").value = parseFloat(report.lotto_actual) || 0;
+  document.getElementById("totalSales").value = parseFloat(report.total_sales) || 0;
+  document.getElementById("salesTax").value = parseFloat(report.sales_tax) || 0;
+  document.getElementById("settlement1").value = parseFloat(report.settlement_1) || 0;
+  document.getElementById("settlement2").value = parseFloat(report.settlement_2) || 0;
+  document.getElementById("lotteryPayout").value = parseFloat(report.lottery_payout) || 0;
+  document.getElementById("totalCashPayout").value = parseFloat(report.total_cash_payout) || 0;
+  document.getElementById("cashInHand").value = parseFloat(report.cash_in_hand) || 0;
+  document.getElementById("shiftNotes").value = report.shift_notes || "";
+  
+  // Set edit mode
+  currentEditingId = report.id;
+  // Show existing entry dot
+  document.getElementById("existingEntryDot").classList.remove("hidden");
+  const editIndicator = document.getElementById("editModeIndicator");
+  editIndicator.classList.remove("hidden");
+  editIndicator.innerHTML = `
+    <div class="flex items-center gap-2">
+      <span class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+      <span class="text-amber-700 font-medium">Editing entry for ${report.date} — changes will update the existing record</span>
+    </div>
+  `;
+  
+  // Populate purchase rows
+  const purchases = report.inventory_purchases || [];
+  purchaseRowsContainer.innerHTML = "";
+  if (purchases.length > 0) {
+    purchases.forEach(p => {
+      createPurchaseRow();
+      const row = purchaseRowsContainer.lastElementChild;
+      const vendorSelect = row.querySelector(".vendor-select");
+      if (vendorSelect && p.vendor) {
+        vendorSelect.value = p.vendor;
+      }
+      row.querySelector(".amount-input").value = parseFloat(p.amount) || 0;
+    });
+  } else {
+    createPurchaseRow();
+    createPurchaseRow();
+  }
+  
+  // Recalculate all derived fields
+  recalcLottery();
+  recalcSales();
+  recalcPurchases();
+}
+
+function clearEditState() {
+  currentEditingId = null;
+  cameFromManager = false;
+  const editIndicator = document.getElementById("editModeIndicator");
+  editIndicator.classList.add("hidden");
+  document.getElementById("backToDashboardBtn").classList.add("hidden");
+  document.getElementById("existingEntryDot").classList.add("hidden");
+  // Clear all form fields
+  clearFormFields();
+}
+
+function clearFormFields() {
+  document.getElementById("lotteryRing").value = 0;
+  document.getElementById("lotteryActual").value = 0;
+  document.getElementById("lotteryDiff").value = 0;
+  document.getElementById("lottoRing").value = 0;
+  document.getElementById("lottoActual").value = 0;
+  document.getElementById("lottoDiff").value = 0;
+  document.getElementById("totalSales").value = 0;
+  document.getElementById("salesTax").value = 0;
+  document.getElementById("settlement1").value = 0;
+  document.getElementById("settlement2").value = 0;
+  document.getElementById("lotteryPayout").value = 0;
+  document.getElementById("totalCashPayout").value = 0;
+  document.getElementById("cashInHand").value = 0;
+  document.getElementById("overShort").value = 0;
+  document.getElementById("shiftNotes").value = "";
+  document.getElementById("grandTotal").value = 0;
+  document.getElementById("totalPurchases").value = 0;
+  document.getElementById("purchasesTotal").value = 0;
+  document.getElementById("purchasesRetail").value = 0;
+  // Clear purchase rows
+  const container = document.getElementById("purchaseRows");
+  container.innerHTML = "";
+  createPurchaseRow();
+  createPurchaseRow();
+}
 
 /* =========================================================
    SECTION 01 — LOTTERY & LOTTO CALCULATIONS
@@ -525,12 +1011,18 @@ function num(id) {
   return isNaN(v) ? 0 : v;
 }
 
+function updateDifference(id, difference) {
+  const differenceEl = document.getElementById(id);
+  differenceEl.value = difference.toFixed(2);
+  differenceEl.classList.toggle("negative-value", difference < 0);
+}
+
 function recalcLottery() {
   const lotteryDiff = num("lotteryRing") - num("lotteryActual");
-  document.getElementById("lotteryDiff").value = lotteryDiff.toFixed(2);
+  updateDifference("lotteryDiff", lotteryDiff);
 
   const lottoDiff = num("lottoRing") - num("lottoActual");
-  document.getElementById("lottoDiff").value = lottoDiff.toFixed(2);
+  updateDifference("lottoDiff", lottoDiff);
 
   const actualLottoLottery = num("lotteryActual") + num("lottoActual");
   document.getElementById("actualLottoLottery").value = actualLottoLottery.toFixed(2);
@@ -566,8 +1058,8 @@ function recalcSales() {
   const overShortEl = document.getElementById("overShort");
   overShortEl.textContent = "$" + Math.abs(overShort).toFixed(2);
   if (overShort < 0) overShortEl.textContent = "-" + overShortEl.textContent;
-  overShortEl.classList.remove("text-green-600", "text-red-600", "text-slate-800");
-  if (overShort > 0) overShortEl.classList.add("text-green-600");
+  overShortEl.classList.remove("text-blue-700", "text-red-600", "text-slate-800");
+  if (overShort > 0) overShortEl.classList.add("text-blue-700");
   else if (overShort < 0) overShortEl.classList.add("text-red-600");
   else overShortEl.classList.add("text-slate-800");
 }
@@ -767,17 +1259,36 @@ document.getElementById("dailyReportForm").addEventListener("submit", async (e) 
   const submitBtn = e.target.querySelector("button[type=submit]");
   submitBtn.disabled = true;
   submitBtn.textContent = "Submitting...";
-
-  const { error } = await supabaseClient.from(TABLE_NAME).insert([payload]);
-
+  
+  let result;
+  if (currentEditingId) {
+    // Update existing entry
+    result = await supabaseClient
+      .from(TABLE_NAME)
+      .update(payload)
+      .eq("id", currentEditingId)
+      .select();
+  } else {
+    // Insert new entry
+    result = await supabaseClient
+      .from(TABLE_NAME)
+      .insert([payload])
+      .select();
+  }
+  
   submitBtn.disabled = false;
   submitBtn.textContent = "Submit Daily Report";
-
-  if (error) {
-    console.error(error);
-    showToast("Error saving report: " + error.message, "error");
+  
+  if (result.error) {
+    console.error(result.error);
+    showToast("Error saving report: " + result.error.message, "error");
   } else {
-    showToast("Daily report submitted successfully!");
+    if (currentEditingId) {
+      showToast("Daily report updated successfully!");
+    } else {
+      showToast("Daily report submitted successfully!");
+    }
+    clearEditState();
     e.target.reset();
     document.getElementById("reportDate").valueAsDate = new Date();
     updateReportDayOfWeek();
@@ -787,6 +1298,127 @@ document.getElementById("dailyReportForm").addEventListener("submit", async (e) 
     recalcLottery();
     recalcSales();
     recalcPurchases();
+    // Reload entry for this date in case it was just created
+    checkAndLoadEntryForDate(document.getElementById("reportDate").value);
+  }
+});
+
+/* ---- Expand/collapse report sections (mouse, keyboard, and touch) ---- */
+document.querySelectorAll(".report-section.collapsible").forEach(section => {
+  const header = section.querySelector(".pos-section-header");
+  const toggleSection = () => {
+    const collapsed = section.classList.toggle("is-collapsed");
+    header.setAttribute("aria-expanded", String(!collapsed));
+  };
+  header.setAttribute("aria-expanded", "true");
+  header.addEventListener("click", toggleSection);
+  header.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleSection();
+    }
+  });
+});
+
+/* ---- Sticky Submit Bar Toggle on Scroll ---- */
+(function initStickySubmit() {
+  const form = document.getElementById("dailyReportForm");
+  const sticky = document.getElementById("stickySubmit");
+  if (!form || !sticky) return;
+  let ticking = false;
+  const updateStickyVisibility = () => {
+    if (ticking) return;
+    window.requestAnimationFrame(() => {
+      const formRect = form.getBoundingClientRect();
+      const stickyVisible = formRect.top < 0 && formRect.bottom > window.innerHeight;
+      sticky.classList.toggle("hidden", !stickyVisible);
+      sticky.classList.toggle("visible", stickyVisible);
+      ticking = false;
+    });
+    ticking = true;
+  };
+  window.addEventListener("scroll", updateStickyVisibility, { passive: true });
+  window.addEventListener("resize", updateStickyVisibility);
+  updateStickyVisibility();
+  setTimeout(() => {
+    const formRect = form.getBoundingClientRect();
+    const stickyVisible = formRect.bottom < window.innerHeight + 80;
+    sticky.classList.toggle("hidden", !stickyVisible);
+    sticky.classList.toggle("visible", stickyVisible);
+  }, 500);
+})();
+
+/* =========================================================
+   EDIT REPORT (from manager table)
+   ========================================================= */
+async function editReport(reportId, reportDate) {
+  try {
+    const { data, error } = await supabaseClient
+      .from(TABLE_NAME)
+      .select("*")
+      .eq("id", reportId)
+      .single();
+    
+    if (error) throw error;
+    
+    // Switch to employee view
+    employeeView.classList.remove("hidden");
+    managerView.classList.add("hidden");
+    
+    // Set the date and load entry
+    document.getElementById("reportDate").value = reportDate;
+    updateReportDayOfWeek();
+    loadEntryForEdit(data);
+    
+    // Focus the date input so manager can change it if needed
+    setTimeout(() => {
+      document.getElementById("reportDate").focus();
+    }, 100);
+    
+    // Update back button visibility (will show for managers)
+    updateBackButtonVisibility();
+  } catch (err) {
+    showToast("Error loading report: " + err.message, "error");
+  }
+}
+
+/* =========================================================
+   BACK TO DASHBOARD (Manager only)
+   ========================================================= */
+function backToDashboard() {
+  // Clear edit state
+  clearEditState();
+
+  // Hide vendor view if open
+  vendorView.classList.add("hidden");
+
+  // Switch to manager view
+  managerView.classList.remove("hidden");
+  employeeView.classList.add("hidden");
+
+  // Reload dashboard data
+  loadDashboardData();
+  renderCalendar();
+
+  // Update back button visibility
+  updateBackButtonVisibility();
+}
+
+// Event listener: clicking on the Date cell in the reports table opens that report for editing
+document.getElementById("reportsTableBody").addEventListener("click", (e) => {
+  const cell = e.target.closest("td");
+  if (!cell) return;
+  
+  // Date column is the first column (cellIndex 0)
+  if (cell.cellIndex === 0) {
+    const dateText = cell.textContent.trim();
+    if (dateText) {
+      const report = currentReports.find(r => r.date === dateText);
+      if (report) {
+        cameFromManager = true;
+        editReport(report.id, report.date);
+      }
+    }
   }
 });
 
@@ -794,12 +1426,13 @@ document.getElementById("dailyReportForm").addEventListener("submit", async (e) 
    MANAGER DASHBOARD
    ========================================================= */
 let salesLineChart, vendorPieChart, inventoryLineChart;
-let currentReports = [];
 let vendorViewYear, vendorViewMonth;
 
 async function loadDashboardData() {
-  const start = document.getElementById("filterStart").value;
-  const end = document.getElementById("filterEnd").value;
+  console.log("=== loadDashboardData START ===");
+  const start = document.getElementById("filterStart")?.value || "";
+  const end = document.getElementById("filterEnd")?.value || "";
+  console.log("Filter dates:", { start, end });
 
   let query = supabaseClient.from(TABLE_NAME).select("*").order("date", { ascending: true });
   if (start) query = query.gte("date", start);
@@ -808,17 +1441,26 @@ async function loadDashboardData() {
   const { data, error } = await query;
 
   if (error) {
-    console.error(error);
+    console.error("Dashboard load error:", error);
     showToast("Error loading reports: " + error.message, "error");
     return;
   }
 
+  console.log("Loaded reports count:", data?.length || 0);
+  console.log("First report:", data?.[0]);
+
   currentReports = data || [];
+  console.log("Calling renderSummary...");
   renderSummary(currentReports);
+  console.log("Calling renderCharts...");
   renderCharts(currentReports);
+  console.log("Calling renderTable...");
   renderTable(currentReports);
+  console.log("Calling renderCalendar...");
   renderCalendar();
+  console.log("Calling renderVendorList...");
   renderVendorList();
+  console.log("=== loadDashboardData END ===");
 }
 
 function renderSummary(reports) {
@@ -830,6 +1472,69 @@ function renderSummary(reports) {
   const cumulativeRetailPurchases = reports.reduce((s, r) => s + ((parseFloat(r.purchases_total) || 0) / 0.67), 0);
   const currentInventory = 100000 + cumulativeRetailPurchases - totalSales;
 
+  // % change vs last calendar month (1st to last day of each month)
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-11
+
+  const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+  const lastMonthIndex = currentMonth === 0 ? 11 : currentMonth - 1;
+
+  const startOfThisMonth = new Date(currentYear, currentMonth, 1);
+  const endOfThisMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+
+  const startOfLastMonth = new Date(lastMonthYear, lastMonthIndex, 1);
+  const endOfLastMonth = new Date(lastMonthYear, lastMonthIndex + 1, 0, 23, 59, 59);
+
+  const inMonth = (r, start, end) => {
+    const d = new Date((r.date || "") + "T00:00:00");
+    return d >= start && d <= end;
+  };
+
+  const thisMonthReports = reports.filter(r => inMonth(r, startOfThisMonth, endOfThisMonth));
+  const lastMonthReports = reports.filter(r => inMonth(r, startOfLastMonth, endOfLastMonth));
+
+  const lastTotalSales = lastMonthReports.reduce((s, r) => s + (parseFloat(r.total_sales) || 0), 0);
+  const lastTotalPurchases = lastMonthReports.reduce((s, r) => s + (parseFloat(r.purchases_total) || 0), 0);
+  const lastAvgSales = lastMonthReports.length ? lastTotalSales / lastMonthReports.length : 0;
+
+  const pct = (cur, prev) => {
+    if (!prev) return null;
+    return ((cur - prev) / prev) * 100;
+  };
+
+  const showChanges = {
+    sumTotalSalesChange: { cur: totalSales, prev: lastTotalSales },
+    sumPurchasesChange: { cur: totalPurchases, prev: lastTotalPurchases },
+    sumAvgSalesChange: { cur: avgSales, prev: lastAvgSales }
+  };
+
+  Object.entries(showChanges).forEach(([id, vals]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const p = pct(vals.cur, vals.prev);
+    if (p === null) {
+      el.textContent = "";
+      el.classList.remove("text-green-600", "text-red-600");
+      return;
+    }
+    const sign = p >= 0 ? "+" : "";
+    el.textContent = ` ${sign}${p.toFixed(0)}% vs last month`;
+    el.classList.toggle("text-green-600", p >= 0);
+    el.classList.toggle("text-red-600", p < 0);
+  });
+
+  // Hide change elements for other stats (Over/Short, Current Inventory, Reports)
+  const hideIds = ["sumOverShortChange", "sumCurrentInventoryChange", "sumCountChange"];
+  hideIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = "";
+      el.classList.remove("text-green-600", "text-red-600");
+    }
+  });
+
+  // Update stat values
   document.getElementById("sumTotalSales").textContent = "$" + totalSales.toFixed(2);
   document.getElementById("sumOverShort").textContent = "$" + totalOverShort.toFixed(2);
   document.getElementById("sumPurchases").textContent = "$" + totalPurchases.toFixed(2);
@@ -916,7 +1621,14 @@ function renderCharts(reports) {
 }
 
 function renderTable(reports) {
+  console.log("=== renderTable START ===");
+  console.log("Reports count:", reports?.length || 0);
   const tbody = document.getElementById("reportsTableBody");
+  console.log("tbody element found:", !!tbody);
+  if (!tbody) {
+    console.error("reportsTableBody element NOT FOUND!");
+    return;
+  }
   tbody.innerHTML = "";
   reports.forEach(r => {
     const tr = document.createElement("tr");
@@ -925,14 +1637,51 @@ function renderTable(reports) {
       <td class="py-2 pr-4">${r.date ?? ""}</td>
       <td class="py-2 pr-4">${r.employee_name ?? ""}</td>
       <td class="py-2 pr-4">$${(parseFloat(r.total_sales) || 0).toFixed(2)}</td>
-      <td class="py-2 pr-4 ${parseFloat(r.over_short) < 0 ? "text-red-600" : "text-green-600"} font-medium">$${(parseFloat(r.over_short) || 0).toFixed(2)}</td>
+      <td class="py-2 pr-4 ${parseFloat(r.over_short) < 0 ? "text-red-600" : "text-blue-700"} font-medium">${parseFloat(r.over_short) < 0 ? "-" : ""}$${Math.abs(parseFloat(r.over_short) || 0).toFixed(2)}</td>
       <td class="py-2 pr-4">$${(parseFloat(r.purchases_total) || 0).toFixed(2)}</td>
       <td class="py-2 pr-4 text-slate-500">${r.shift_notes ?? ""}</td>
+      ${r.id ? `
+            <td class="py-2 pr-4">
+              <div class="flex gap-1">
+                <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded text-xs" onclick="cameFromManager=true; editReport('${r.id}', '${r.date}')">Edit</button>
+                <button class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-1 px-3 rounded text-xs" onclick="deleteReport('${r.id}', '${r.date}')">Delete</button>
+              </div>
+            </td>
+          ` : ""}
     `;
     tbody.appendChild(tr);
   });
+  console.log("renderTable DONE - tbody innerHTML length:", tbody.innerHTML.length);
+  console.log("=== renderTable END ===");
 }
 
+/* =========================================================
+   DELETE REPORT (Manager only)
+   ========================================================= */
+async function deleteReport(reportId, reportDate) {
+  if (!confirm('Are you sure you want to delete this daily report?')) return;
+  
+  try {
+    const { error } = await supabaseClient
+      .from(TABLE_NAME)
+      .delete()
+      .eq('id', reportId);
+    
+    if (error) throw error;
+    
+    showToast('Daily report deleted successfully!');
+    
+    // Reload dashboard data
+    loadDashboardData();
+    renderCalendar();
+  } catch (err) {
+    showToast('Error deleting report: ' + err.message, 'error');
+  }
+}
+
+/* =========================================================
+   RENDER CALENDAR
+   ========================================================= */
 function renderCalendar() {
   const calGrid = document.getElementById("calendarGrid");
   calGrid.innerHTML = "";
@@ -961,12 +1710,10 @@ function renderCalendar() {
     const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const hasData = monthSales[dateStr] !== undefined;
     const sales = monthSales[dateStr] || 0;
-    html += `<div class="p-2 rounded text-xs ${hasData ? "bg-green-50 text-green-700 font-semibold" : "text-slate-500"}">${d}<div class="text-[10px]">$${sales.toFixed(0)}</div></div>`;
+    html += `<div class="p-2 rounded text-xs ${hasData ? "bg-blue-50 text-blue-900 font-semibold" : "text-slate-500"}">${d}<div class="text-[10px]">$${sales.toFixed(0)}</div></div>`;
   }
   calGrid.innerHTML = html;
 }
-
-let calYear, calMonth;
 
 document.getElementById("calPrevMonth").addEventListener("click", () => {
   calMonth = (calMonth ?? (new Date().getMonth() - 1)) - 1;
@@ -1105,12 +1852,177 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function openVendorModal() {
+  // Legacy modal - kept for compatibility
   document.getElementById('vendorModal').classList.remove('hidden');
   loadExistingVendorsForModal();
 }
 
 function closeVendorModal() {
   document.getElementById('vendorModal').classList.add('hidden');
+}
+
+/* =========================================================
+   NEW VENDOR VIEW FUNCTIONS
+   ========================================================= */
+
+function openVendorView() {
+  // Hide current view
+  document.getElementById('employeeView').classList.add('hidden');
+  document.getElementById('managerView').classList.add('hidden');
+  // Show vendor view
+  document.getElementById('vendorView').classList.remove('hidden');
+  // Load vendors
+  loadVendorsForView();
+}
+
+function backToMainView() {
+  document.getElementById('vendorView').classList.add('hidden');
+  const session = JSON.parse(sessionStorage.getItem('cstore_user') || '{}');
+  if (session.role === 'manager') {
+    document.getElementById('managerView').classList.remove('hidden');
+  } else {
+    document.getElementById('employeeView').classList.remove('hidden');
+  }
+}
+
+async function loadVendorsForView() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('vendors')
+      .select('name, representative, phone, id')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+
+    const tbody = document.getElementById('vendorsTableBody');
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-slate-400 py-4">No vendors found. Add one above!</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(v => `
+      <tr class="border-b border-slate-100" data-vendor-id="${v.id}">
+        <td class="py-2 pr-4 vendor-name-cell">${v.name || ''}</td>
+        <td class="py-2 pr-4 vendor-rep-cell">${v.representative || '—'}</td>
+        <td class="py-2 pr-4 vendor-phone-cell">${v.phone || '—'}</td>
+        <td class="py-2 pr-4">
+          <div class="flex gap-1">
+            <button type="button" onclick="startEditVendor('${v.id}')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded text-xs">Edit</button>
+            <button type="button" onclick="deleteVendorInline('${v.id}', '${(v.name || '').replace(/'/g, "\\'")}')" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-1 px-3 rounded text-xs">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Error loading vendors:', err);
+    showToast('Error loading vendors: ' + err.message, 'error');
+  }
+}
+
+function startEditVendor(vendorId) {
+  const row = document.querySelector(`tr[data-vendor-id="${vendorId}"]`);
+  if (!row) return;
+
+  const name = row.querySelector('.vendor-name-cell').textContent;
+  const rep = row.querySelector('.vendor-rep-cell').textContent;
+  const phone = row.querySelector('.vendor-phone-cell').textContent;
+
+  row.innerHTML = `
+    <td class="py-2 pr-4">
+      <input type="text" id="editName_${vendorId}" value="${name}" class="field-input w-full text-sm" />
+    </td>
+    <td class="py-2 pr-4">
+      <input type="text" id="editRep_${vendorId}" value="${rep === '—' ? '' : rep}" class="field-input w-full text-sm" />
+    </td>
+    <td class="py-2 pr-4">
+      <input type="text" id="editPhone_${vendorId}" value="${phone === '—' ? '' : phone}" class="field-input w-full text-sm" />
+    </td>
+    <td class="py-2 pr-4">
+      <div class="flex gap-1">
+        <button type="button" onclick="saveVendorEdit('${vendorId}')" class="bg-blue-700 hover:bg-blue-800 text-white font-bold py-1 px-3 rounded text-xs">Save</button>
+        <button type="button" onclick="cancelVendorEdit('${vendorId}')" class="bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold py-1 px-3 rounded text-xs">Cancel</button>
+      </div>
+    </td>
+  `;
+}
+
+async function saveVendorEdit(vendorId) {
+  const name = document.getElementById(`editName_${vendorId}`).value.trim();
+  const representative = document.getElementById(`editRep_${vendorId}`).value.trim();
+  const phone = document.getElementById(`editPhone_${vendorId}`).value.trim();
+
+  if (!name) {
+    showToast('Vendor name is required', 'error');
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from('vendors')
+      .update({ name, representative, phone })
+      .eq('id', vendorId);
+
+    if (error) throw error;
+
+    showToast('Vendor updated successfully!');
+    loadVendorsForView();
+  } catch (err) {
+    showToast('Error updating vendor: ' + err.message, 'error');
+  }
+}
+
+function cancelVendorEdit(vendorId) {
+  loadVendorsForView();
+}
+
+async function deleteVendorInline(vendorId, vendorName) {
+  if (!confirm(`Are you sure you want to delete "${vendorName}"?`)) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from('vendors')
+      .delete()
+      .eq('id', vendorId);
+
+    if (error) throw error;
+
+    showToast('Vendor deleted successfully!');
+    loadVendorsForView();
+  } catch (err) {
+    showToast('Error deleting vendor: ' + err.message, 'error');
+  }
+}
+
+async function addVendor() {
+  const name = document.getElementById('vendorName').value.trim();
+  const representative = document.getElementById('vendorRep').value.trim();
+  const phone = document.getElementById('vendorPhone').value.trim();
+
+  if (!name) {
+    showToast('Vendor name is required', 'error');
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from('vendors')
+      .insert([{ name, representative, phone, is_active: true }]);
+
+    if (error) throw error;
+
+    showToast(`Vendor "${name}" added successfully!`);
+
+    // Clear form
+    document.getElementById('vendorName').value = '';
+    document.getElementById('vendorRep').value = '';
+    document.getElementById('vendorPhone').value = '';
+
+    // Reload vendor list
+    loadVendorsForView();
+    loadVendorsFromSupabase(); // Also refresh dropdowns
+  } catch (err) {
+    showToast('Error adding vendor: ' + err.message, 'error');
+  }
 }
 
 async function loadExistingVendorsForModal() {
@@ -1275,12 +2187,12 @@ async function deleteVendor() {
             <input type="text" id="newRepNameEdit" placeholder="New representative" class="field-input w-full" />
             <input type="text" id="newPhoneEdit" placeholder="New phone" class="field-input w-full" />
           </div>
-          <button type="button" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm" onclick="editVendor()">Save Changes</button>
+          <button type="button" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-sm" onclick="editVendor()">Save Changes</button>
         </div>
         
         <div>
           <h4 class="text-sm font-medium text-slate-600 mb-2">Delete Vendor</h4>
-          <button type="button" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="deleteVendor()">Delete Selected Vendor</button>
+          <button type="button" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1 rounded text-sm" onclick="deleteVendor()">Delete Selected Vendor</button>
         </div>
         
         <div id="existingVendorsList" class="space-y-2 max-h-32 overflow-y-auto p-2 bg-slate-50 rounded border border-slate-100">
