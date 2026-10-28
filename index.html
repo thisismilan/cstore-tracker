@@ -444,14 +444,19 @@
   </header>
 
   <form id="dailyReportForm" class="card p-6 space-y-5">
-    <div id="existingEntryDot" class="hidden report-edit-notice">
-      <span class="w-3 h-3 bg-blue-700 rounded-full inline-block mr-2"></span>
-      <span class="text-blue-800">Editing existing report — changes will update the saved record.</span>
+    <div id="existingEntryDot" class="hidden report-edit-notice border-l-4 border-blue-500 bg-blue-50 p-3">
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 bg-blue-700 rounded-full inline-block"></span>
+        <span class="text-blue-800 font-semibold">Existing report found — changes will update the saved record.</span>
+      </div>
     </div>
 
     <!-- Edit Mode Indicator -->
-    <div id="editModeIndicator" class="hidden report-edit-notice mb-4">
-      Saving changes to this existing report…
+    <div id="editModeIndicator" class="hidden report-edit-notice mb-4 border-l-4 border-amber-500 bg-amber-50 p-3">
+      <div class="flex items-center gap-2">
+        <span class="text-amber-500 font-bold">⚠️</span>
+        <span class="text-amber-700 font-semibold">Editing existing report — changes will update the saved record.</span>
+      </div>
     </div>
 
     <!-- Back to Dashboard Button (Manager only, shown when opened from dashboard) -->
@@ -470,14 +475,14 @@
           <label class="field-label">Lottery Ring</label>
           <div class="field-wrap">
             <span class="dollar-prefix">$</span>
-            <input type="number" step="0.01" id="lotteryRing" class="lotto-input field-input" placeholder="0.00" value="0" />
+            <input type="number" step="0.01" id="lotteryRing" class="lotto-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
           </div>
         </div>
         <div>
           <label class="field-label">Lottery Actual</label>
           <div class="field-wrap">
             <span class="dollar-prefix">$</span>
-            <input type="number" step="0.01" id="lotteryActual" class="lotto-input field-input" placeholder="0.00" value="0" />
+            <input type="number" step="0.01" id="lotteryActual" class="lotto-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
           </div>
         </div>
         <div>
@@ -494,14 +499,14 @@
           <label class="field-label">Lotto Ring</label>
           <div class="field-wrap">
             <span class="dollar-prefix">$</span>
-            <input type="number" step="0.01" id="lottoRing" class="lotto-input field-input" placeholder="0.00" value="0" />
+            <input type="number" step="0.01" id="lottoRing" class="lotto-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
           </div>
         </div>
         <div>
           <label class="field-label">Lotto Actual</label>
           <div class="field-wrap">
             <span class="dollar-prefix">$</span>
-            <input type="number" step="0.01" id="lottoActual" class="lotto-input field-input" placeholder="0.00" value="0" />
+            <input type="number" step="0.01" id="lottoActual" class="lotto-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
           </div>
         </div>
         <div>
@@ -528,14 +533,14 @@
             <label class="field-label">Total Sales</label>
             <div class="field-wrap">
               <span class="dollar-prefix">$</span>
-              <input type="number" step="0.01" id="totalSales" class="calc-input field-input" placeholder="0.00" value="0" />
+              <input type="number" step="0.01" id="totalSales" class="calc-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
             </div>
           </div>
           <div>
             <label class="field-label">Sales Tax</label>
             <div class="field-wrap">
               <span class="dollar-prefix">$</span>
-              <input type="number" step="0.01" id="salesTax" class="calc-input field-input" placeholder="0.00" value="0" />
+              <input type="number" step="0.01" id="salesTax" class="calc-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
             </div>
           </div>
           <div>
@@ -553,35 +558,35 @@
             <label class="field-label">Settlement 1</label>
             <div class="field-wrap">
               <span class="dollar-prefix">$</span>
-              <input type="number" step="0.01" id="settlement1" class="calc-input field-input" placeholder="0.00" value="0" />
+              <input type="number" step="0.01" id="settlement1" class="calc-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
             </div>
           </div>
           <div>
             <label class="field-label">Settlement 2</label>
             <div class="field-wrap">
               <span class="dollar-prefix">$</span>
-              <input type="number" step="0.01" id="settlement2" class="calc-input field-input" placeholder="0.00" value="0" />
+              <input type="number" step="0.01" id="settlement2" class="calc-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
             </div>
           </div>
           <div>
             <label class="field-label">Lottery Payout</label>
             <div class="field-wrap">
               <span class="dollar-prefix">$</span>
-              <input type="number" step="0.01" id="lotteryPayout" class="calc-input field-input" placeholder="0.00" value="0" />
+              <input type="number" step="0.01" id="lotteryPayout" class="calc-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
             </div>
           </div>
           <div>
             <label class="field-label">Total Cash Payout</label>
             <div class="field-wrap">
               <span class="dollar-prefix">$</span>
-              <input type="number" step="0.01" id="totalCashPayout" class="calc-input field-input" placeholder="0.00" value="0" />
+              <input type="number" step="0.01" id="totalCashPayout" class="calc-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
             </div>
           </div>
           <div>
             <label class="field-label">Cash in Hand</label>
             <div class="field-wrap">
               <span class="dollar-prefix">$</span>
-              <input type="number" step="0.01" id="cashInHand" class="calc-input field-input" placeholder="0.00" value="0" />
+              <input type="number" step="0.01" id="cashInHand" class="calc-input field-input" placeholder="0.00" value="0" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
             </div>
           </div>
         </div>
@@ -1136,15 +1141,15 @@ function clearFormFields() {
   document.getElementById("cashInHand").value = 0;
   document.getElementById("overShort").value = 0;
   document.getElementById("shiftNotes").value = "";
-  document.getElementById("grandTotal").value = 0;
-  document.getElementById("totalPurchases").value = 0;
-  document.getElementById("purchasesTotal").value = 0;
-  document.getElementById("purchasesRetail").value = 0;
   // Clear purchase rows
   const container = document.getElementById("purchaseRows");
   container.innerHTML = "";
   createPurchaseRow();
   createPurchaseRow();
+  // Recalculate all derived/readonly fields so they show $0.00, not stale values
+  recalcLottery();
+  recalcSales();
+  recalcPurchases();
 }
 
 /* =========================================================
@@ -1232,7 +1237,7 @@ function createPurchaseRow(vendorName = "") {
       </select>
       <div class="field-wrap w-40">
         <span class="dollar-prefix">$</span>
-        <input type="number" step="0.01" placeholder="0.00" value="0" class="amount-input field-input" />
+        <input type="number" step="0.01" placeholder="0.00" value="0" class="amount-input field-input" onfocus="if(this.value==='0')this.value=''" onblur="if(this.value==='')this.value='0'" />
       </div>
       <button type="button" class="remove-row-btn text-slate-400 hover:text-red-600 text-lg leading-none px-1">✕</button>
     </div>
