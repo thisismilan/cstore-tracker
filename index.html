@@ -192,12 +192,40 @@
   }
   #managerView .stat-card .stat-top { display:flex; align-items:center; gap:0.65rem; }
   #managerView .stat-card .stat-icon {
-    width:34px; height:34px;
-    border-radius:0.65rem;
+    width:38px; height:38px;
+    flex:0 0 38px;
+    border-radius:0.6rem;
     display:grid; place-items:center;
-    color:#fff;
-    font-weight:800;
+    color:#1e40af;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    font-size:1.05rem;
+    transition:transform .15s ease;
   }
+  #managerView .stat-card { transition:border-color .15s ease; }
+  #managerView .stat-card:hover { border-color:#94a3b8; }
+  #managerView .stat-card:hover .stat-icon { transform:scale(1.06); }
+  #managerView .analytics-summary > .stat-card:nth-child(1) .stat-icon {
+    color:#1e40af !important; background:#eff6ff !important; border-color:#bfdbfe;
+  }
+  #managerView .analytics-summary > .stat-card:nth-child(2) .stat-icon {
+    color:#b45309 !important; background:#fffbeb !important; border-color:#fde68a;
+  }
+  #managerView .analytics-summary > .stat-card:nth-child(3) .stat-icon {
+    color:#4338ca !important; background:#eef2ff !important; border-color:#c7d2fe;
+  }
+  #managerView .analytics-summary > .stat-card:nth-child(4) .stat-icon {
+    color:#047857 !important; background:#ecfdf5 !important; border-color:#a7f3d0;
+  }
+  #managerView .analytics-summary > .stat-card:nth-child(5) .stat-icon {
+    color:#7e22ce !important; background:#faf5ff !important; border-color:#e9d5ff;
+  }
+  #managerView .analytics-summary > .stat-card:nth-child(6) .stat-icon {
+    color:#334155 !important; background:#f1f5f9 !important; border-color:#cbd5e1;
+  }
+  #managerView .stat-card .stat-top { justify-content:flex-start !important; }
+  #managerView .stat-card > .flex.items-baseline { justify-content:flex-start; flex-wrap:wrap; }
+  #managerView .stat-card .stat-value { font-variant-numeric:tabular-nums; }
   #managerView .stat-card .stat-label {
     font-size:0.75rem;
     letter-spacing:0.06em;
@@ -227,10 +255,126 @@
     #managerView { padding-left:0.85rem; padding-right:0.85rem; }
     #managerView .analytics-controls { gap:0.5rem; }
     #managerView .analytics-controls input[type="date"] { min-width:0; flex:1; }
-    #managerView .analytics-summary { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    #managerView .analytics-summary { grid-template-columns: repeat(2, minmax(0,1fr)); gap:0.6rem; }
+    #managerView .card.stat-card { min-width:0; padding:0.75rem; }
+    #managerView .stat-card .stat-top { align-items:flex-start; gap:0.5rem; }
+    #managerView .stat-card .stat-icon { width:32px; height:32px; flex-basis:32px; border-radius:0.5rem; font-size:0.92rem; }
+    #managerView .stat-card .stat-label { min-width:0; font-size:0.67rem; line-height:1.25; letter-spacing:0.045em; }
+    #managerView .stat-card .stat-value { font-size:1rem; overflow-wrap:anywhere; }
+    #managerView .stat-card .stat-change { font-size:0.68rem; line-height:1.2; }
+    #managerView .stat-card .text-xs.text-slate-500 { line-height:1.35; }
   }
   .empty-state .empty-icon { font-size: 3rem; margin-bottom: 0.5rem; }
   .empty-state p { margin-bottom: 0.25rem; }
+
+  /* ---- Employee form: prevent narrow-screen overflow ---- */
+  #employeeView,
+  #dailyReportForm,
+  #dailyReportForm .report-section,
+  #dailyReportForm .section-content {
+    min-width: 0;
+  }
+
+  #dailyReportForm input,
+  #dailyReportForm select,
+  #dailyReportForm textarea {
+    max-width: 100%;
+  }
+
+  @media (max-width: 640px) {
+    #employeeView {
+      width: 100%;
+      max-width: 100%;
+      margin-left: 0;
+      margin-right: 0;
+      padding: .75rem .625rem 7rem;
+    }
+
+    .report-topline {
+      padding: .9rem;
+      gap: .75rem;
+    }
+
+    .report-heading > div:first-child {
+      width: 100%;
+    }
+
+    .report-date-control {
+      min-width: 0;
+    }
+
+    #dailyReportForm {
+      width: 100%;
+      padding: 0;
+    }
+
+    #dailyReportForm .report-section {
+      padding: .8rem;
+    }
+
+    #dailyReportForm .report-sales-columns {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1rem;
+    }
+
+    #dailyReportForm .report-sales-columns > div:first-child {
+      padding-right: 0;
+      padding-bottom: 1rem;
+      border-right: 0;
+      border-bottom: 1px solid #dbe6f2;
+    }
+
+    #dailyReportForm .purchase-row > .flex {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: .5rem;
+      align-items: center;
+    }
+
+    #dailyReportForm .purchase-row .vendor-select {
+      grid-column: 1 / -1;
+      width: 100%;
+      min-width: 0;
+    }
+
+    #dailyReportForm .purchase-row .field-wrap.w-40 {
+      width: 100%;
+      min-width: 0;
+    }
+
+    #dailyReportForm .purchase-row .remove-row-btn {
+      min-width: 44px;
+      min-height: 44px;
+      display: grid;
+      place-items: center;
+    }
+
+    #dailyReportForm .overshort-box {
+      gap: .75rem;
+      padding: .8rem;
+    }
+
+    #dailyReportForm #overShort {
+      font-size: 1.25rem;
+      white-space: nowrap;
+    }
+
+    #dailyReportForm #addPurchaseRow {
+      max-width: 100%;
+      white-space: normal;
+      text-align: left;
+    }
+
+    #dailyReportForm .section-content > .flex.items-center.justify-between {
+      flex-wrap: wrap;
+      gap: .75rem;
+    }
+
+    #stickySubmit {
+      padding-left: .75rem;
+      padding-right: .75rem;
+    }
+  }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -536,8 +680,8 @@
   <div class="analytics-summary">
     <div class="card p-4 text-center stat-card">
       <div class="stat-top" style="justify-content:center;">
-        <div class="stat-icon" style="background:#1d4ed8; color:#fff; font-size:1.2rem;">
-          <i class="fa-solid fa-shopping-bag"></i>
+        <div class="stat-icon">
+          <i class="fa-solid fa-cash-register"></i>
         </div>
         <div class="stat-label">Total Sales</div>
       </div>
@@ -548,7 +692,7 @@
     </div>
     <div class="card p-4 text-center stat-card">
       <div class="stat-top" style="justify-content:center;">
-        <div class="stat-icon" style="background:#ef4444; color:#fff; font-size:1.2rem;">
+        <div class="stat-icon">
           <i class="fa-solid fa-scale-balanced"></i>
         </div>
         <div class="stat-label">Total Over/Short</div>
@@ -560,8 +704,8 @@
     </div>
     <div class="card p-4 text-center stat-card">
       <div class="stat-top" style="justify-content:center;">
-        <div class="stat-icon" style="background:#2563eb; color:#fff; font-size:1.2rem;">
-          <i class="fa-solid fa-shopping-cart"></i>
+        <div class="stat-icon">
+          <i class="fa-solid fa-truck-fast"></i>
         </div>
         <div class="stat-label">Total Purchases</div>
       </div>
@@ -572,8 +716,8 @@
     </div>
     <div class="card p-4 text-center stat-card">
       <div class="stat-top" style="justify-content:center;">
-        <div class="stat-icon" style="background:#16a34a; color:#fff; font-size:1.2rem;">
-          <i class="fa-solid fa-store"></i>
+        <div class="stat-icon">
+          <i class="fa-solid fa-warehouse"></i>
         </div>
         <div class="stat-label">Current Inventory</div>
       </div>
@@ -585,8 +729,8 @@
     </div>
     <div class="card p-4 text-center stat-card">
       <div class="stat-top" style="justify-content:center;">
-        <div class="stat-icon" style="background:#9333ea; color:#fff; font-size:1.2rem;">
-          <i class="fa-solid fa-chart-line"></i>
+        <div class="stat-icon">
+          <i class="fa-solid fa-money-bill-trend-up"></i>
         </div>
         <div class="stat-label">Avg Daily Sales</div>
       </div>
@@ -597,8 +741,8 @@
     </div>
     <div class="card p-4 text-center stat-card">
       <div class="stat-top" style="justify-content:center;">
-        <div class="stat-icon" style="background:#475569; color:#fff; font-size:1.2rem;">
-          <i class="fa-solid fa-clipboard"></i>
+        <div class="stat-icon">
+          <i class="fa-solid fa-clipboard-list"></i>
         </div>
         <div class="stat-label">Reports</div>
       </div>
