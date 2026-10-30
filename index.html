@@ -800,7 +800,14 @@
 
   <!-- Data table -->
   <div class="card p-4 overflow-x-auto">
-    <h3 class="font-semibold text-slate-700 mb-3">Daily Reports</h3>
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold text-slate-700">Daily Reports</h3>
+      <div class="flex items-center gap-2">
+        <button id="tablePrevMonth" class="text-slate-600 hover:text-slate-900 text-sm font-medium">&larr; Prev</button>
+        <span id="tableMonthLabel" class="text-sm font-semibold text-slate-800 min-w-[8rem] text-center"></span>
+        <button id="tableNextMonth" class="text-slate-600 hover:text-slate-900 text-sm font-medium">Next &rarr;</button>
+      </div>
+    </div>
     <table class="min-w-full text-sm">
       <thead>
         <tr class="text-left border-b border-slate-300 text-slate-600">
@@ -882,6 +889,7 @@ let currentEditingId = null;
 let cameFromManager = false;
 let currentReports = [];
 let calYear, calMonth;
+let tableYear, tableMonth;
 
 /* =========================================================
    TOAST HELPER
@@ -1124,30 +1132,41 @@ function clearEditState() {
 }
 
 function clearFormFields() {
-  document.getElementById("lotteryRing").value = 0;
-  document.getElementById("lotteryActual").value = 0;
-  document.getElementById("lotteryDiff").value = 0;
-  document.getElementById("lottoRing").value = 0;
-  document.getElementById("lottoActual").value = 0;
-  document.getElementById("lottoDiff").value = 0;
-  document.getElementById("totalSales").value = 0;
-  document.getElementById("salesTax").value = 0;
-  document.getElementById("settlement1").value = 0;
-  document.getElementById("settlement2").value = 0;
-  document.getElementById("lotteryPayout").value = 0;
-  document.getElementById("totalCashPayout").value = 0;
-  document.getElementById("cashInHand").value = 0;
-  document.getElementById("overShort").value = 0;
-  document.getElementById("shiftNotes").value = "";
-  document.getElementById("grandTotal").value = 0;
-  document.getElementById("totalPurchases").value = 0;
-  document.getElementById("purchasesTotal").value = 0;
-  document.getElementById("purchasesRetail").value = 0;
+  const setValue = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
+  };
+  const setTextContent = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
+
+  setValue("lotteryRing", 0);
+  setValue("lotteryActual", 0);
+  setValue("lotteryDiff", 0);
+  setValue("lottoRing", 0);
+  setValue("lottoActual", 0);
+  setValue("lottoDiff", 0);
+  setValue("totalSales", 0);
+  setValue("salesTax", 0);
+  setValue("settlement1", 0);
+  setValue("settlement2", 0);
+  setValue("lotteryPayout", 0);
+  setValue("totalCashPayout", 0);
+  setValue("cashInHand", 0);
+  setValue("overShort", 0);
+  setValue("shiftNotes", "");
+  // Clear display-only spans (not inputs)
+  setTextContent("grandTotalSales", "$0.00");
+  setTextContent("grandTotalSettlements", "$0.00");
+  setTextContent("purchasesTotal", "0.00");
   // Clear purchase rows
   const container = document.getElementById("purchaseRows");
-  container.innerHTML = "";
-  createPurchaseRow();
-  createPurchaseRow();
+  if (container) {
+    container.innerHTML = "";
+    createPurchaseRow();
+    createPurchaseRow();
+  }
 }
 
 /* =========================================================
@@ -1555,20 +1574,56 @@ async function editReport(reportId, reportDate) {
 /* =========================================================
    BACK TO DASHBOARD (Manager only)
    ========================================================= */
-function backToDashboard() {
+async function backToDashboard() {
+  try {
+    // Clear edit state
+    clearEditState();
+
+    // Hide vendor view if open
+    vendorView.classList.add("hidden");
+
+    // Switch to manager view
+    managerView.classList.remove("hidden");
+    employeeView.classList.add("hidden");
+
+    // Reload dashboard data (await to ensure completion)
+    await loadDashboardData();
+    renderCalendar();
+
+    // Update back button visibility
+    updateBackButtonVisibility();
+  } catch (err) {
+    console.error("Error returning to dashboard:", err);
+    showToast("Error loading dashboard: " + err.message, "error");
+    // Fallback: ensure manager view is visible
+    managerView.classList.remove("hidden");
+    employeeView.classList.add("hidden");
+    vendorView.classList.add("hidden");
+    updateBackButtonVisibility();
+  }
+}
+
+/* ---- Switch to employee view for a specific date (from calendar click) ---- */
+function switchToEmployeeDate(dateStr) {
   // Clear edit state
   clearEditState();
 
   // Hide vendor view if open
   vendorView.classList.add("hidden");
 
-  // Switch to manager view
-  managerView.classList.remove("hidden");
-  employeeView.classList.add("hidden");
+  // Switch to employee view
+  employeeView.classList.remove("hidden");
+  managerView.classList.add("hidden");
 
-  // Reload dashboard data
-  loadDashboardData();
-  renderCalendar();
+  // Set the date and load entry
+  document.getElementById("reportDate").value = dateStr;
+  updateReportDayOfWeek();
+  checkAndLoadEntryForDate(dateStr);
+
+  // Focus the date input so manager can change it if needed
+  setTimeout(() => {
+    document.getElementById("reportDate").focus();
+  }, 100);
 
   // Update back button visibility
   updateBackButtonVisibility();
@@ -1620,6 +1675,12 @@ async function loadDashboardData() {
   console.log("First report:", data?.[0]);
 
   currentReports = data || [];
+  // Initialize table month/year to current month if not already set
+  if (!tableYear || !tableMonth) {
+    const now = new Date();
+    tableYear = now.getFullYear();
+    tableMonth = now.getMonth();
+  }
   console.log("Calling renderSummary...");
   renderSummary(currentReports);
   console.log("Calling renderCharts...");
@@ -1630,16 +1691,32 @@ async function loadDashboardData() {
   renderCalendar();
   console.log("Calling renderVendorList...");
   renderVendorList();
+  // Update table month label
+  const tableMonthLabel = document.getElementById("tableMonthLabel");
+  if (tableMonthLabel) {
+    tableMonthLabel.textContent = new Date(tableYear, tableMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
   console.log("=== loadDashboardData END ===");
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${month}-${day}-${year}`; // mm-dd-yyyy format
+}
+
 function renderSummary(reports) {
-  const totalSales = reports.reduce((s, r) => s + (parseFloat(r.total_sales) || 0), 0);
-  const totalOverShort = reports.reduce((s, r) => s + (parseFloat(r.over_short) || 0), 0);
-  const totalPurchases = reports.reduce((s, r) => s + (parseFloat(r.purchases_total) || 0), 0);
-  const avgSales = reports.length ? totalSales / reports.length : 0;
+  // Filter out null entries to prevent "Cannot read properties of null" errors
+  const validReports = reports.filter(r => r != null);
+  const totalSales = validReports.reduce((s, r) => s + (parseFloat(r.total_sales) || 0), 0);
+  const totalOverShort = validReports.reduce((s, r) => s + (parseFloat(r.over_short) || 0), 0);
+  const totalPurchases = validReports.reduce((s, r) => s + (parseFloat(r.purchases_total) || 0), 0);
+  const avgSales = validReports.length ? totalSales / validReports.length : 0;
   // Current Inventory = Starting ($100k) + Cumulative Retail Purchases - Cumulative Sales
-  const cumulativeRetailPurchases = reports.reduce((s, r) => s + ((parseFloat(r.purchases_total) || 0) / 0.67), 0);
+  const cumulativeRetailPurchases = validReports.reduce((s, r) => s + ((parseFloat(r.purchases_total) || 0) / 0.67), 0);
   const currentInventory = 100000 + cumulativeRetailPurchases - totalSales;
 
   // % change vs last calendar month (1st to last day of each month)
@@ -1714,12 +1791,14 @@ function renderSummary(reports) {
 }
 
 function renderCharts(reports) {
-  const labels = reports.map(r => r.date);
-  const salesData = reports.map(r => parseFloat(r.total_sales) || 0);
-  const overShortData = reports.map(r => parseFloat(r.over_short) || 0);
+  // Filter out null entries to prevent "Cannot read properties of null" errors
+  const validReports = reports.filter(r => r != null);
+  const labels = validReports.map(r => r.date);
+  const salesData = validReports.map(r => parseFloat(r.total_sales) || 0);
+  const overShortData = validReports.map(r => parseFloat(r.over_short) || 0);
 
   const vendorTotals = {};
-  reports.forEach(r => {
+  validReports.forEach(r => {
     (r.inventory_purchases || []).forEach(p => {
       const vendor = p.vendor || "Unknown";
       vendorTotals[vendor] = (vendorTotals[vendor] || 0) + (parseFloat(p.amount) || 0);
@@ -1737,8 +1816,8 @@ function renderCharts(reports) {
     data: {
       labels,
       datasets: [{
-        label: "Total Sales ($)",
-        data: salesData,
+        label: "Cumulative Total Sales ($)",
+        data: reports.map((r, i) => reports.slice(0, i + 1).reduce((s, rr) => s + (parseFloat(rr.total_sales) || 0), 0)),
         borderColor: "#1d4ed8",
         backgroundColor: "rgba(29,78,216,0.1)",
         tension: 0.3,
@@ -1800,11 +1879,18 @@ function renderTable(reports) {
     return;
   }
   tbody.innerHTML = "";
-  reports.forEach(r => {
+  // Filter out null entries to prevent "Cannot read properties of null" errors
+  const validReports = reports.filter(r => r != null);
+  const filteredReports = validReports.filter(r => {
+    if (!tableYear || !tableMonth) return true;
+    const d = new Date((r.date || "") + "T00:00:00");
+    return d.getFullYear() === tableYear && d.getMonth() === tableMonth;
+  });
+  filteredReports.forEach(r => {
     const tr = document.createElement("tr");
     tr.className = "border-b border-slate-100 hover:bg-slate-50";
     tr.innerHTML = `
-      <td class="py-2 pr-4">${r.date ?? ""}</td>
+      <td class="py-2 pr-4">${formatDate(r.date)}</td>
       <td class="py-2 pr-4">${r.employee_name ?? ""}</td>
       <td class="py-2 pr-4">$${(parseFloat(r.total_sales) || 0).toFixed(2)}</td>
       <td class="py-2 pr-4 ${parseFloat(r.over_short) < 0 ? "text-red-600" : "text-blue-700"} font-medium">${parseFloat(r.over_short) < 0 ? "-" : ""}$${Math.abs(parseFloat(r.over_short) || 0).toFixed(2)}</td>
@@ -1866,11 +1952,15 @@ function renderCalendar() {
   const startDay = firstDay.getDay();
   
   const monthSales = {};
-  currentReports.forEach(r => {
+  const monthReportIds = {};
+  // Filter out null entries to prevent "Cannot read properties of null" errors
+  const validCurrentReports = currentReports.filter(r => r != null);
+  validCurrentReports.forEach(r => {
     const d = new Date(r.date + "T00:00:00");
     if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) {
       const key = r.date;
       monthSales[key] = (monthSales[key] || 0) + (parseFloat(r.total_sales) || 0);
+      monthReportIds[key] = r.id;
     }
   });
 
@@ -1880,7 +1970,11 @@ function renderCalendar() {
     const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const hasData = monthSales[dateStr] !== undefined;
     const sales = monthSales[dateStr] || 0;
-    html += `<div class="p-2 rounded text-xs ${hasData ? "bg-blue-50 text-blue-900 font-semibold" : "text-slate-500"}">${d}<div class="text-[10px]">$${sales.toFixed(0)}</div></div>`;
+    const reportId = monthReportIds[dateStr] || "";
+    const clickHandler = reportId 
+      ? `cameFromManager=true; editReport('${reportId}', '${dateStr}')`
+      : `switchToEmployeeDate('${dateStr}')`;
+    html += `<div class="p-2 rounded text-xs cursor-pointer hover:bg-blue-100 ${hasData ? "bg-blue-50 text-blue-900 font-semibold" : "text-slate-500"}" onclick="${clickHandler}">${d}<div class="text-[10px]">$${sales.toFixed(0)}</div></div>`;
   }
   calGrid.innerHTML = html;
 }
@@ -1897,6 +1991,22 @@ document.getElementById("calNextMonth").addEventListener("click", () => {
   renderCalendar();
 });
 
+document.getElementById("tablePrevMonth").addEventListener("click", () => {
+  tableMonth = (tableMonth ?? (new Date().getMonth() - 1)) - 1;
+  if (tableMonth < 0) { tableMonth = 11; tableYear = (tableYear ?? new Date().getFullYear()) - 1; }
+  renderTable(currentReports);
+  const label = document.getElementById("tableMonthLabel");
+  if (label) label.textContent = new Date(tableYear, tableMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+});
+
+document.getElementById("tableNextMonth").addEventListener("click", () => {
+  tableMonth = (tableMonth ?? (new Date().getMonth() - 1)) + 1;
+  if (tableMonth > 11) { tableMonth = 0; tableYear = (tableYear ?? new Date().getFullYear()) + 1; }
+  renderTable(currentReports);
+  const label = document.getElementById("tableMonthLabel");
+  if (label) label.textContent = new Date(tableYear, tableMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+});
+
 function renderVendorList() {
   const vendorListEl = document.getElementById("vendorList");
   const vendorMonthLabel = document.getElementById("vendorMonthLabel");
@@ -1908,7 +2018,9 @@ function renderVendorList() {
   
   // Collect vendor totals for this month
   const vendorTotals = {};
-  currentReports.forEach(r => {
+  // Filter out null entries to prevent "Cannot read properties of null" errors
+  const validCurrentReports = currentReports.filter(r => r != null);
+  validCurrentReports.forEach(r => {
     const d = new Date(r.date + "T00:00:00");
     if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) {
       (r.inventory_purchases || []).forEach(p => {
@@ -1952,11 +2064,13 @@ document.getElementById("applyFilterBtn").addEventListener("click", loadDashboar
    EXCEL EXPORT (SheetJS)
    ========================================================= */
 document.getElementById("exportExcelBtn").addEventListener("click", () => {
-  if (!currentReports.length) {
+  // Filter out null entries to prevent "Cannot read properties of null" errors
+  const validReports = currentReports.filter(r => r != null);
+  if (!validReports.length) {
     showToast("No data to export", "error");
     return;
   }
-  const exportData = currentReports.map(r => ({
+  const exportData = validReports.map(r => ({
     Date: r.date,
     Employee: r.employee_name,
     "Lottery Ring": r.lottery_ring,
