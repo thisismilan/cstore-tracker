@@ -648,9 +648,23 @@
     <button type="button" onclick="document.getElementById('dailyReportForm').requestSubmit()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold tracking-wide uppercase text-sm py-4 px-6 rounded shadow w-full sm:w-auto">
       Submit Daily Report
     </button>
-    <button type="button" onclick="backToDashboard()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold text-sm py-4 px-6 rounded w-full sm:w-auto">
+    <button id="stickyBackToDashboardBtn" type="button" onclick="backToDashboard()" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold text-sm py-4 px-6 rounded w-full sm:w-auto">
       ← Back to Dashboard
     </button>
+  </div>
+
+  <!-- Monthly Sales Calendar (Employee View) -->
+  <div class="card p-4">
+    <h3 class="font-semibold text-slate-700 mb-4">Monthly Sales Calendar</h3>
+    <div class="flex items-center justify-between mb-4">
+      <button id="empCalPrevMonth" class="text-slate-600 hover:text-slate-900 font-medium">&larr; Prev</button>
+      <h4 id="empCalMonthYear" class="text-lg font-semibold text-slate-800"></h4>
+      <button id="empCalNextMonth" class="text-slate-600 hover:text-slate-900 font-medium">Next &rarr;</button>
+    </div>
+    <div class="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-500 mb-2">
+      <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+    </div>
+    <div id="empCalendarGrid" class="grid grid-cols-7 gap-1"></div>
   </div>
 
 </div>
@@ -890,6 +904,7 @@ let cameFromManager = false;
 let currentReports = [];
 let calYear, calMonth;
 let tableYear, tableMonth;
+let empCalMonth, empCalYear;
 
 /* =========================================================
    TOAST HELPER
@@ -934,7 +949,7 @@ function validateLogin(name, role, password) {
   return false;
 }
 
-function applySession(name, role) {
+async function applySession(name, role) {
   navUserInfo.textContent = `Signed in as ${name}`;
   navRoleBadge.textContent = role;
   loginScreen.classList.add("hidden");
@@ -971,6 +986,12 @@ function applySession(name, role) {
     updateReportDayOfWeek();
     // Check if entry exists for yesterday and load it for editing
     checkAndLoadEntryForDate(yesterday.toISOString().split("T")[0]);
+    // Load reports data for calendar
+    await loadReportsData();
+    // Render employee calendar
+    renderEmployeeCalendar();
+    // Setup auto-clear of "0" values on focus
+    setupZeroAutoClear();
   }
   // Update back button visibility based on role
   updateBackButtonVisibility();
@@ -1026,10 +1047,13 @@ document.getElementById("reportDate").addEventListener("change", (e) => {
 function updateBackButtonVisibility() {
   const session = JSON.parse(sessionStorage.getItem("cstore_user") || "{}");
   const backBtn = document.getElementById("backToDashboardBtn");
+  const stickyBackBtn = document.getElementById("stickyBackToDashboardBtn");
   if (session.role === "manager") {
     backBtn.classList.remove("hidden");
+    stickyBackBtn.classList.remove("hidden");
   } else {
     backBtn.classList.add("hidden");
+    stickyBackBtn.classList.add("hidden");
   }
 }
 
@@ -1357,7 +1381,7 @@ function recalcPurchases() {
   document.getElementById("purchasesTotal").textContent = total.toFixed(2);
 }
 
-document.getElementById("addPurchaseRow").addEventListener("click", createPurchaseRow);
+document.getElementById("addPurchaseRow").addEventListener("click", () => createPurchaseRow());
 createPurchaseRow(); // default purchase row 1
 createPurchaseRow(); // default purchase row 2
 
@@ -1489,6 +1513,9 @@ document.getElementById("dailyReportForm").addEventListener("submit", async (e) 
     recalcPurchases();
     // Reload entry for this date in case it was just created
     checkAndLoadEntryForDate(document.getElementById("reportDate").value);
+    // Reload reports data and refresh calendar
+    await loadReportsData();
+    renderEmployeeCalendar();
   }
 });
 
@@ -1564,6 +1591,10 @@ async function editReport(reportId, reportDate) {
       document.getElementById("reportDate").focus();
     }, 100);
     
+    // Reload reports data and render calendar
+    await loadReportsData();
+    renderEmployeeCalendar();
+    
     // Update back button visibility (will show for managers)
     updateBackButtonVisibility();
   } catch (err) {
@@ -1575,6 +1606,12 @@ async function editReport(reportId, reportDate) {
    BACK TO DASHBOARD (Manager only)
    ========================================================= */
 async function backToDashboard() {
+  // Only allow managers to return to dashboard
+  const session = JSON.parse(sessionStorage.getItem("cstore_user") || "{}");
+  if (session.role !== "manager") {
+    showToast("Access denied: Dashboard is for managers only", "error");
+    return;
+  }
   try {
     // Clear edit state
     clearEditState();
@@ -1604,7 +1641,7 @@ async function backToDashboard() {
 }
 
 /* ---- Switch to employee view for a specific date (from calendar click) ---- */
-function switchToEmployeeDate(dateStr) {
+async function switchToEmployeeDate(dateStr) {
   // Clear edit state
   clearEditState();
 
@@ -1624,6 +1661,12 @@ function switchToEmployeeDate(dateStr) {
   setTimeout(() => {
     document.getElementById("reportDate").focus();
   }, 100);
+
+  // Render employee calendar
+  await loadReportsData();
+  renderEmployeeCalendar();
+  // Setup auto-clear of "0" values on focus
+  setupZeroAutoClear();
 
   // Update back button visibility
   updateBackButtonVisibility();
@@ -1646,6 +1689,23 @@ document.getElementById("reportsTableBody").addEventListener("click", (e) => {
     }
   }
 });
+
+/* =========================================================
+   LOAD ALL REPORTS DATA (no rendering)
+   ========================================================= */
+async function loadReportsData() {
+  try {
+    let query = supabaseClient.from(TABLE_NAME).select("*").order("date", { ascending: true });
+    const { data, error } = await query;
+    if (error) {
+      console.error("Load reports error:", error);
+      return;
+    }
+    currentReports = data || [];
+  } catch (err) {
+    console.error("Load reports failed:", err);
+  }
+}
 
 /* =========================================================
    MANAGER DASHBOARD
@@ -1795,7 +1855,6 @@ function renderCharts(reports) {
   const validReports = reports.filter(r => r != null);
   const labels = validReports.map(r => r.date);
   const salesData = validReports.map(r => parseFloat(r.total_sales) || 0);
-  const overShortData = validReports.map(r => parseFloat(r.over_short) || 0);
 
   const vendorTotals = {};
   validReports.forEach(r => {
@@ -1822,19 +1881,6 @@ function renderCharts(reports) {
         backgroundColor: "rgba(29,78,216,0.1)",
         tension: 0.3,
         fill: true
-      }]
-    },
-    options: { responsive: true, plugins: { legend: { display: false } } }
-  });
-
-  overShortBarChart = new Chart(document.getElementById("overShortBarChart"), {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{
-        label: "Over/Short ($)",
-        data: overShortData,
-        backgroundColor: overShortData.map(v => v < 0 ? "#dc2626" : "#16a34a")
       }]
     },
     options: { responsive: true, plugins: { legend: { display: false } } }
@@ -1977,6 +2023,76 @@ function renderCalendar() {
     html += `<div class="p-2 rounded text-xs cursor-pointer hover:bg-blue-100 ${hasData ? "bg-blue-50 text-blue-900 font-semibold" : "text-slate-500"}" onclick="${clickHandler}">${d}<div class="text-[10px]">$${sales.toFixed(0)}</div></div>`;
   }
   calGrid.innerHTML = html;
+}
+
+/* =========================================================
+   EMPLOYEE MONTHLY SALES CALENDAR
+   ========================================================= */
+function renderEmployeeCalendar() {
+  const calGrid = document.getElementById("empCalendarGrid");
+  calGrid.innerHTML = "";
+  const calMonthYear = document.getElementById("empCalMonthYear");
+  const now = new Date();
+  const viewYear = empCalYear || now.getFullYear();
+  const viewMonth = empCalMonth ?? now.getMonth(); // 0-indexed, default to current month
+  calMonthYear.textContent = new Date(viewYear, viewMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const startDay = firstDay.getDay();
+
+  const monthSales = {};
+  const monthReportIds = {};
+  // Filter out null entries to prevent "Cannot read properties of null" errors
+  const validCurrentReports = currentReports.filter(r => r != null);
+  validCurrentReports.forEach(r => {
+    const d = new Date(r.date + "T00:00:00");
+    if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) {
+      const key = r.date;
+      monthSales[key] = (monthSales[key] || 0) + (parseFloat(r.total_sales) || 0);
+      monthReportIds[key] = r.id;
+    }
+  });
+
+  let html = "";
+  for (let i = 0; i < startDay; i++) html += `<div></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const hasData = monthSales[dateStr] !== undefined;
+    const sales = monthSales[dateStr] || 0;
+    const reportId = monthReportIds[dateStr] || "";
+    const clickHandler = reportId
+      ? `cameFromManager=true; editReport('${reportId}', '${dateStr}')`
+      : `switchToEmployeeDate('${dateStr}')`;
+    html += `<div class="p-2 rounded text-xs cursor-pointer hover:bg-blue-100 ${hasData ? "bg-blue-50 text-blue-900 font-semibold" : "text-slate-500"}" onclick="${clickHandler}">${d}<div class="text-[10px]">$${sales.toFixed(0)}</div></div>`;
+  }
+  calGrid.innerHTML = html;
+}
+
+document.getElementById("empCalPrevMonth").addEventListener("click", () => {
+  empCalMonth = (empCalMonth ?? new Date().getMonth()) - 1;
+  if (empCalMonth < 0) { empCalMonth = 11; empCalYear = (empCalYear ?? new Date().getFullYear()) - 1; }
+  renderEmployeeCalendar();
+});
+
+document.getElementById("empCalNextMonth").addEventListener("click", () => {
+  empCalMonth = (empCalMonth ?? new Date().getMonth()) + 1;
+  if (empCalMonth > 11) { empCalMonth = 0; empCalYear = (empCalYear ?? new Date().getFullYear()) + 1; }
+  renderEmployeeCalendar();
+});
+
+/* =========================================================
+   AUTO-CLEAR "0" ON INPUT FOCUS
+   ========================================================= */
+function setupZeroAutoClear() {
+  const zeroInputs = document.querySelectorAll('input[type="number"][value="0"]');
+  zeroInputs.forEach(input => {
+    input.addEventListener("focus", function() {
+      if (this.value === "0" || this.value === "0.00") {
+        this.value = "";
+      }
+    });
+  });
 }
 
 document.getElementById("calPrevMonth").addEventListener("click", () => {
