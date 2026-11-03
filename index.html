@@ -29,7 +29,7 @@
     <div class="flex items-center gap-4">
       <span id="navUserInfo" class="text-sm text-slate-300"></span>
       <span id="navRoleBadge" class="text-xs font-semibold px-2 py-1 rounded bg-indigo-600 uppercase"></span>
-      <button id="vendorMgmtBtn" onclick="openVendorView()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded hidden">Manage Vendors</button>
+      <button id="vendorMgmtBtnEmployee" onclick="openVendorView()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded hidden">Manage Vendors</button>
       <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded">Logout</button>
     </div>
   </div>
@@ -296,7 +296,7 @@
 
   <!-- Monthly Sales Calendar (Employee View) -->
   <div class="card p-4">
-    <h3 class="font-semibold text-slate-700 mb-4">Monthly Sales Calendar</h3>
+    <h3 class="font-semibold text-slate-700 mb-4">Daily Sales Calendar</h3>
     <div class="flex items-center justify-between mb-4">
       <button id="empCalPrevMonth" class="text-slate-600 hover:text-slate-900 font-medium">&larr; Prev</button>
       <h4 id="empCalMonthYear" class="text-lg font-semibold text-slate-800"></h4>
@@ -310,29 +310,55 @@
 
 </div>
 
+<!-- ============ MANAGER NAVIGATION ============ -->
+<div id="managerTopbarShell" class="manager-topbar-shell hidden">
+  <div class="manager-topbar">
+    <div class="manager-topbar-brand"><span class="manager-brand-icon">🏪</span><span>C-Store Sales Tracker<small>Manager workspace</small></span></div>
+    <nav class="manager-tabs" aria-label="Manager dashboard sections" role="tablist">
+      <button type="button" class="manager-tab active" data-manager-tab="overview" role="tab" aria-selected="true">Overview</button>
+      <button type="button" class="manager-tab" data-manager-tab="vendors" role="tab" aria-selected="false">Vendors</button>
+      <button type="button" class="manager-tab" data-manager-tab="inventory" role="tab" aria-selected="false">Inventory</button>
+      <button type="button" class="manager-tab" data-manager-tab="reports" role="tab" aria-selected="false">Daily Reports</button>
+      <button type="button" class="manager-tab" data-manager-tab="lottery" role="tab" aria-selected="false">Lottery</button>
+    </nav>
+    <div class="manager-topbar-actions">
+      <span id="managerNavUserInfo" class="manager-nav-user">Signed in as Manager</span>
+      <button type="button" id="managerThemeToggle" class="manager-icon-button" aria-label="Switch to dark mode" title="Switch light/dark mode">◐</button>
+      <button type="button" id="managerLogoutBtn" class="manager-logout-button">Logout</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MANAGER VIEW ============ -->
 <div id="managerView" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
-  <div class="analytics-header">
-    <h2 class="text-2xl font-bold text-slate-800">Analytics Dashboard</h2>
-    <p>Track your sales, inventory and performance at a glance.</p>
-  </div>
 
   <!-- Filters -->
   <div class="card p-4 analytics-controls flex flex-wrap items-end gap-4">
-    <div>
-      <label class="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
-      <input type="date" id="filterStart" />
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" data-period="prev" class="period-btn px-4 py-2 rounded font-semibold text-sm border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">&larr; Prev Month</button>
+      <button type="button" data-period="current" class="period-btn px-4 py-2 rounded font-semibold text-sm border bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700">Current Month</button>
+      <button type="button" data-period="next" class="period-btn px-4 py-2 rounded font-semibold text-sm border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">Next Month &rarr;</button>
+      <button type="button" data-period="custom" class="period-btn px-4 py-2 rounded font-semibold text-sm border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">Custom</button>
     </div>
-    <div>
-      <label class="block text-sm font-medium text-slate-700 mb-1">End Date</label>
-      <input type="date" id="filterEnd" />
+    <div id="customRange" class="flex items-end gap-4" style="display:none;">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+        <input type="date" id="filterStart" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+        <input type="date" id="filterEnd" />
+      </div>
+      <button id="applyFilterBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-semibold">Apply</button>
     </div>
-    <button id="applyFilterBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-semibold">Apply</button>
+    <span id="activePeriodText" class="text-sm font-semibold text-slate-800 self-center"></span>
     <button id="exportExcelBtn" class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold">Export to Excel</button>
   </div>
 
-  <!-- Summary cards -->
-  <div class="analytics-summary">
+  <div class="manager-tab-panel active" id="managerTab-overview" role="tabpanel">
+  <div class="manager-section-heading"><div><h2>Overview</h2><p>Sales, inventory and vendor performance for your selected period.</p></div><span class="manager-period-hint">All figures follow selected period</span></div>
+  <!-- Overview summary cards -->
+  <div class="analytics-summary overview-summary">
     <div class="card p-4 text-center stat-card">
       <div class="stat-top" style="justify-content:center;">
         <div class="stat-icon">
@@ -343,18 +369,6 @@
       <div class="flex items-baseline justify-center gap-2">
         <div id="sumTotalSales" class="stat-value">$0.00</div>
         <div id="sumTotalSalesChange" class="stat-change text-sm font-bold"></div>
-      </div>
-    </div>
-    <div class="card p-4 text-center stat-card">
-      <div class="stat-top" style="justify-content:center;">
-        <div class="stat-icon">
-          <i class="fa-solid fa-scale-balanced"></i>
-        </div>
-        <div class="stat-label">Total Over/Short</div>
-      </div>
-      <div class="flex items-baseline justify-center gap-2">
-        <div id="sumOverShort" class="stat-value">$0.00</div>
-        <div id="sumOverShortChange" class="stat-change text-sm font-bold"></div>
       </div>
     </div>
     <div class="card p-4 text-center stat-card">
@@ -372,19 +386,6 @@
     <div class="card p-4 text-center stat-card">
       <div class="stat-top" style="justify-content:center;">
         <div class="stat-icon">
-          <i class="fa-solid fa-warehouse"></i>
-        </div>
-        <div class="stat-label">Current Inventory</div>
-      </div>
-      <div class="flex items-baseline justify-center gap-2">
-        <div id="sumCurrentInventory" class="stat-value">$0.00</div>
-        <div id="sumCurrentInventoryChange" class="stat-change text-sm font-bold"></div>
-      </div>
-      <div class="text-xs text-slate-500">($100k base + retail purchases - sales)</div>
-    </div>
-    <div class="card p-4 text-center stat-card">
-      <div class="stat-top" style="justify-content:center;">
-        <div class="stat-icon">
           <i class="fa-solid fa-money-bill-trend-up"></i>
         </div>
         <div class="stat-label">Avg Daily Sales</div>
@@ -396,30 +397,21 @@
     </div>
     <div class="card p-4 text-center stat-card">
       <div class="stat-top" style="justify-content:center;">
-        <div class="stat-icon">
-          <i class="fa-solid fa-clipboard-list"></i>
-        </div>
-        <div class="stat-label">Reports</div>
+        <div class="stat-icon"><i class="fa-solid fa-warehouse"></i></div>
+        <div class="stat-label">Current Inventory</div>
       </div>
-      <div class="flex items-baseline justify-center gap-2">
-        <div id="sumCount" class="stat-value">0</div>
-        <div id="sumCountChange" class="stat-change text-sm font-bold"></div>
-      </div>
+      <div id="sumCurrentInventory" class="stat-value">$0.00</div>
+      <div class="text-xs text-slate-500">Running estimate at period end</div>
     </div>
   </div>
 
   <!-- Monthly Calendar View -->
   <div class="card p-4">
-    <h3 class="font-semibold text-slate-700 mb-4">Monthly Sales Calendar</h3>
-    <div class="flex items-center justify-between mb-4">
-      <button id="calPrevMonth" class="text-slate-600 hover:text-slate-900 font-medium">&larr; Prev</button>
+    <h3 class="font-semibold text-slate-700 mb-4">Daily Sales Calendar</h3>
+    <div class="flex items-center justify-center mb-4">
       <h4 id="calMonthYear" class="text-lg font-semibold text-slate-800"></h4>
-      <button id="calNextMonth" class="text-slate-600 hover:text-slate-900 font-medium">Next &rarr;</button>
     </div>
-    <div class="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-500 mb-2">
-      <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
-    </div>
-    <div id="calendarGrid" class="grid grid-cols-7 gap-1"></div>
+    <div id="calendarGrid" class="calendar-months"></div>
   </div>
 
   <!-- Charts -->
@@ -435,33 +427,68 @@
     <div class="card p-4 lg:col-span-2">
       <h3 class="font-semibold text-slate-700 mb-2">Purchases by Vendor</h3>
       <div class="flex flex-col md:flex-row gap-4">
-        <div class="max-w-md mx-auto">
-          <canvas id="vendorPieChart" height="180"></canvas>
+        <div class="vendor-pie-wrap mx-auto">
+          <canvas id="overviewVendorPieChart"></canvas>
         </div>
         <div class="flex-1">
           <div class="flex items-center justify-between mb-2">
             <h4 class="text-sm font-medium text-slate-600">Vendor Purchase List</h4>
-            <div class="flex gap-2">
-              <button id="vendorPrevMonth" class="text-slate-600 hover:text-slate-900 text-sm">&larr; Prev</button>
-              <span id="vendorMonthLabel" class="text-sm font-semibold text-slate-800"></span>
-              <button id="vendorNextMonth" class="text-slate-600 hover:text-slate-900 text-sm">Next &rarr;</button>
-            </div>
+            <span id="vendorMonthLabel" class="text-sm font-semibold text-slate-800"></span>
           </div>
-          <div id="vendorList" class="max-h-64 overflow-y-auto border border-slate-200 rounded"></div>
+          <div id="overviewVendorList" class="max-h-64 overflow-y-auto border border-slate-200 rounded"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Data table -->
+  </div>
+
+  <div class="manager-tab-panel" id="managerTab-vendors" role="tabpanel" hidden>
+    <div class="manager-section-heading"><div><h2>Vendors</h2><p>Sales, purchases and profit margin for the selected date range.</p></div><div class="flex items-center gap-3"><span class="manager-period-hint">Selected period</span><button type="button" id="managerVendorMgmtBtn" onclick="openVendorView()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-3 py-2 rounded">Manage Vendors</button></div></div>
+    <div class="analytics-summary vendor-summary">
+      <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-cash-register"></i></div><div class="stat-label">Total Sales</div></div><div id="vendorsTotalSales" class="stat-value">$0.00</div></div>
+      <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-truck-fast"></i></div><div class="stat-label">Total Purchases</div></div><div id="vendorsTotalPurchases" class="stat-value">$0.00</div></div>
+      <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-percent"></i></div><div class="stat-label">Profit Margin</div></div><div id="vendorsProfitMargin" class="stat-value">—</div><div class="text-xs text-slate-500">(Sales − Purchases) ÷ Sales</div></div>
+    </div>
+    <div class="card p-4 mt-4">
+      <h3 class="font-semibold text-slate-700 mb-2">Purchases by Vendor</h3>
+      <div class="flex flex-col md:flex-row gap-4 items-center">
+        <div class="vendor-pie-wrap mx-auto"><canvas id="vendorPieChart"></canvas></div>
+        <div class="flex-1 w-full"><h4 class="text-sm font-medium text-slate-600 mb-2">Vendor Purchase List</h4><div id="vendorList" class="max-h-64 overflow-y-auto border border-slate-200 rounded"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="manager-tab-panel" id="managerTab-inventory" role="tabpanel" hidden>
+    <div class="manager-section-heading"><div><h2>Inventory</h2><p>Running inventory estimate and dated physical counts.</p></div><span class="manager-period-hint">Selected period</span></div>
+    <div class="analytics-summary inventory-summary">
+      <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-warehouse"></i></div><div class="stat-label">Running Inventory</div></div><div id="inventoryRunningValue" class="stat-value">$0.00</div><div id="inventoryAsOf" class="text-xs text-slate-500"></div></div>
+      <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div><div class="stat-label">Latest Physical Count</div></div><div id="inventoryPhysicalValue" class="stat-value">—</div><div id="inventoryPhysicalDate" class="text-xs text-slate-500">No physical count recorded</div></div>
+    </div>
+    <div class="card p-5 mt-4">
+      <h3 class="font-semibold text-slate-700 mb-1">Enter Physical Inventory Count</h3>
+      <p class="text-sm text-slate-500 mb-4">Enter the dollar value and the date the count was actually completed. The date can vary each month.</p>
+      <form id="inventoryCountForm" class="inventory-count-form">
+        <div><label for="inventoryCountDate">Count date</label><input type="date" id="inventoryCountDate" required /></div>
+        <div><label for="inventoryCountAmount">Physical inventory ($)</label><input type="number" id="inventoryCountAmount" min="0" step="0.01" required placeholder="0.00" /></div>
+        <div class="inventory-count-notes"><label for="inventoryCountNotes">Notes (optional)</label><input type="text" id="inventoryCountNotes" maxlength="500" placeholder="e.g. Monthly shelf count" /></div>
+        <button type="submit" id="saveInventoryCountBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded">Save Physical Count</button>
+      </form>
+      <p class="text-xs text-slate-500 mt-3">Variance = physical count minus system estimate for that date. Positive is over; negative is short. Saving requires the inventory-count table migration in Supabase.</p>
+      <p id="inventoryMigrationNotice" class="inventory-migration-notice hidden" role="status"></p>
+    </div>
+    <div class="card p-4 mt-4 overflow-x-auto">
+      <div class="flex items-center justify-between mb-3"><h3 class="font-semibold text-slate-700">Physical Count History</h3><span id="inventoryHistoryRange" class="text-sm text-slate-500"></span></div>
+      <table class="min-w-full text-sm"><thead><tr class="text-left border-b border-slate-300 text-slate-600"><th class="py-2 pr-4">Count Date</th><th class="py-2 pr-4">Physical Count</th><th class="py-2 pr-4">System Estimate</th><th class="py-2 pr-4">Over / Short</th><th class="py-2 pr-4">Notes</th></tr></thead><tbody id="inventoryCountsBody"></tbody></table>
+    </div>
+  </div>
+
+  <div class="manager-tab-panel" id="managerTab-reports" role="tabpanel" hidden>
+  <div class="manager-section-heading"><div><h2>Daily Reports</h2><p>Review, edit or delete reports in the selected date range.</p></div><span id="reportsPeriodHeading" class="manager-period-hint"></span></div>
   <div class="card p-4 overflow-x-auto">
     <div class="flex items-center justify-between mb-3">
       <h3 class="font-semibold text-slate-700">Daily Reports</h3>
-      <div class="flex items-center gap-2">
-        <button id="tablePrevMonth" class="text-slate-600 hover:text-slate-900 text-sm font-medium">&larr; Prev</button>
-        <span id="tableMonthLabel" class="text-sm font-semibold text-slate-800 min-w-[8rem] text-center"></span>
-        <button id="tableNextMonth" class="text-slate-600 hover:text-slate-900 text-sm font-medium">Next &rarr;</button>
-      </div>
+      <span id="tableMonthLabel" class="text-sm font-semibold text-slate-800"></span>
     </div>
     <table class="min-w-full text-sm">
       <thead>
@@ -477,6 +504,17 @@
       </thead>
       <tbody id="reportsTableBody"></tbody>
     </table>
+  </div>
+  </div>
+
+  <div class="manager-tab-panel" id="managerTab-lottery" role="tabpanel" hidden>
+    <div class="manager-section-heading"><div><h2>Lottery</h2><p>Lottery and lotto performance for the selected date range.</p></div><span class="manager-period-hint">Selected period</span></div>
+    <div class="analytics-summary lottery-summary">
+      <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-ticket"></i></div><div class="stat-label">Lottery Sales</div></div><div id="lotteryTotalSales" class="stat-value">$0.00</div><div class="text-xs text-slate-500">Lottery actual sales</div></div>
+      <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-ticket-simple"></i></div><div class="stat-label">Lotto Sales</div></div><div id="lottoTotalSales" class="stat-value">$0.00</div><div class="text-xs text-slate-500">Lotto actual sales</div></div>
+      <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-cash-register"></i></div><div class="stat-label">Lottery + Lotto Sales</div></div><div id="lotteryOverallSales" class="stat-value">$0.00</div></div>
+      <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-money-bill-transfer"></i></div><div class="stat-label">Total Payout</div></div><div id="lotteryPayoutTotal" class="stat-value">$0.00</div><div class="text-xs text-slate-500">Lottery payout only</div></div>
+    </div>
   </div>
 </div>
 

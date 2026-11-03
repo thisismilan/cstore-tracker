@@ -232,8 +232,116 @@
 
   #managerView .charts-wrap { gap:1rem; }
 
+  /* ---- Manager dashboard horizontal section navigation ---- */
+  #managerView { max-width:88rem; }
+  .manager-topbar-shell { max-width:88rem; margin:1rem auto 0; padding:0 1rem; }
+  .manager-topbar-shell .manager-topbar {
+    display:flex; align-items:center; gap:1.5rem; min-height:4.25rem;
+    padding:.55rem 1rem; border-radius:.9rem; color:#f8fafc;
+    background:linear-gradient(115deg,#081a30,#12365a 72%,#174a72);
+    box-shadow:0 10px 24px rgba(8,26,48,.18);
+  }
+  .manager-topbar-brand { display:flex; align-items:center; gap:.65rem; flex:0 0 auto; font-weight:700; white-space:nowrap; }
+  .manager-topbar-brand small { display:block; margin-top:.1rem; color:#bbcee3; font-size:.65rem; font-weight:500; letter-spacing:.08em; text-transform:uppercase; }
+  .manager-brand-icon { display:grid; place-items:center; width:2.5rem; height:2.5rem; border-radius:.7rem; background:linear-gradient(145deg,#34d1ae,#1687cc); font-size:1.25rem; }
+  .manager-tabs { display:flex; align-items:center; gap:.25rem; flex:1; min-width:0; overflow-x:auto; }
+  .manager-tab { flex:0 0 auto; padding:.65rem .85rem; border:0; border-radius:.55rem; color:#c3d1e0; background:transparent; font-size:.82rem; font-weight:650; transition:background .15s,color .15s; }
+  .manager-tab:hover { color:white; background:rgba(255,255,255,.09); }
+  .manager-tab.active { color:white; background:#2878e5; box-shadow:0 4px 12px rgba(40,120,229,.28); }
+  .manager-topbar-actions { display:flex; align-items:center; gap:.7rem; flex:0 0 auto; }
+  .manager-nav-user { color:#d5e2ef; font-size:.72rem; white-space:nowrap; }
+  .manager-icon-button { display:grid; place-items:center; width:2.35rem; height:2.35rem; border:1px solid rgba(255,255,255,.18); border-radius:.65rem; color:#f8fafc; background:rgba(255,255,255,.06); font-size:1.05rem; }
+  .manager-icon-button:hover { background:rgba(255,255,255,.15); }
+  .manager-logout-button { padding:.58rem .85rem; border:0; border-radius:.55rem; color:#fff; background:#dc3f4b; font-size:.75rem; font-weight:700; }
+  .manager-logout-button:hover { background:#c92f3b; }
+  .manager-tab-panel { display:none; min-width:0; }
+  .manager-tab-panel.active { display:block; animation:managerPanelIn .16s ease-out; }
+  @keyframes managerPanelIn { from { opacity:.7; transform:translateY(3px); } to { opacity:1; transform:none; } }
+  #managerView .manager-section-heading { display:flex; align-items:end; justify-content:space-between; gap:1rem; margin:.35rem 0 1rem; }
+  #managerView .manager-section-heading h2 { margin:0; color:#0f2944; font-size:1.45rem; font-weight:750; letter-spacing:-.025em; }
+  #managerView .manager-section-heading p { margin:.3rem 0 0; color:#64748b; font-size:.88rem; }
+  #managerView .manager-period-hint { color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; border-radius:999px; padding:.35rem .7rem; font-size:.7rem; font-weight:700; white-space:nowrap; }
+  #managerView .overview-summary { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  #managerView .analytics-summary.vendor-summary,
+  #managerView .analytics-summary.inventory-summary,
+  #managerView .analytics-summary.lottery-summary { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  #managerView .analytics-summary.lottery-summary { grid-template-columns:repeat(5,minmax(0,1fr)); }
+  #managerView .vendor-summary { grid-template-columns:repeat(3,minmax(0,1fr)); margin-bottom:1rem; }
+  #managerView .inventory-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  #managerView .lottery-summary { grid-template-columns:repeat(5,minmax(0,1fr)); }
+  #managerView .calendar-months { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr)); gap:1rem; }
+  #managerView .calendar-month { min-width:0; }
+  #managerView .calendar-month > h4 { margin:0 0 .65rem; text-align:center; font-weight:700; color:#334155; }
+  #managerView .calendar-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:.25rem; }
+  #managerView .calendar-weekday { padding:.35rem 0; text-align:center; color:#64748b; font-size:.68rem; font-weight:700; }
+  #managerView .calendar-day { display:flex; min-width:0; min-height:3.8rem; flex-direction:column; align-items:flex-start; gap:.35rem; padding:.45rem; border:1px solid #e2e8f0; border-radius:.5rem; background:#fff; color:#64748b; font-size:.7rem; text-align:left; }
+  #managerView button.calendar-day:not(:disabled) { cursor:pointer; }
+  #managerView button.calendar-day:not(:disabled):hover { border-color:#93c5fd; background:#eff6ff; }
+  #managerView .calendar-day-selected { background:#f8fbff; }
+  #managerView .calendar-day-has-data { border-color:#bfdbfe; background:#eff6ff; color:#173b65; }
+  #managerView .calendar-day strong { color:#1d4ed8; font-size:.68rem; font-weight:750; }
+  #managerView .calendar-day-outside { opacity:.38; }
+  #managerView .calendar-day-empty { border-color:transparent; background:transparent; }
+  #managerView .inventory-count-form { display:flex; align-items:end; flex-wrap:wrap; gap:.85rem; }
+  #managerView .inventory-count-form > div { min-width:10rem; }
+  #managerView .inventory-count-form .inventory-count-notes { flex:1 1 14rem; }
+  #managerView .inventory-count-form label { display:block; margin-bottom:.3rem; color:#475569; font-size:.75rem; font-weight:600; }
+  #managerView .inventory-count-form input { min-height:2.5rem; }
+  #managerView .vendor-pie-wrap { position:relative; width:min(100%,22rem); height:16.875rem; min-width:0; flex:0 1 22rem; margin-inline:auto; }
+  #managerView .vendor-pie-wrap canvas { display:block; width:100% !important; height:100% !important; }
+  #managerView .inventory-migration-notice:not(.hidden) { margin-top:.75rem; padding:.65rem .8rem; border:1px solid #f3d28b; border-radius:.5rem; color:#805b13; background:#fffbeb; font-size:.8rem; }
+
+  /* Manager-only dark theme, toggled from the manager navigation bar. */
+  body.manager-dark { --surface:#10243a; --bg:#081525; --text:#e9f2ff; --text-muted:#9ab0c9; --border:#263d56; background:#081525; color:#e9f2ff; }
+  body.manager-dark #managerView .manager-section-heading h2,
+  body.manager-dark #managerView .stat-card .stat-value,
+  body.manager-dark #managerView .font-semibold,
+  body.manager-dark #managerView h3,
+  body.manager-dark #managerView h4 { color:#e9f2ff; }
+  body.manager-dark #managerView .card,
+  body.manager-dark #managerView .calendar-day { color:#e9f2ff; background:#10243a; border-color:#263d56; }
+  body.manager-dark #managerView .manager-period-hint { color:#9ecaff; background:#17395d; border-color:#2c5c8b; }
+  body.manager-dark #managerView .calendar-day-selected,
+  body.manager-dark #managerView .calendar-day-has-data { background:#17395d; border-color:#2b5d8e; color:#e9f2ff; }
+  body.manager-dark #managerView .calendar-day strong { color:#8fc3ff; }
+  body.manager-dark #managerView .calendar-day-outside { opacity:.32; }
+  body.manager-dark #managerView input,
+  body.manager-dark #managerView select { color:#e9f2ff; background:#0b1a2a; border-color:#39516b; }
+  body.manager-dark #managerView .text-slate-500,
+  body.manager-dark #managerView .text-slate-600,
+  body.manager-dark #managerView .text-slate-700 { color:#a9bbce !important; }
+  body.manager-dark #managerView .border-slate-100,
+  body.manager-dark #managerView .border-slate-200,
+  body.manager-dark #managerView .border-slate-300 { border-color:#263d56 !important; }
+  body.manager-dark #managerView .bg-white,
+  body.manager-dark #managerView .bg-slate-50 { background:#10243a !important; }
+  body.manager-dark #managerView .hover\:bg-slate-50:hover { background:#18334e !important; }
+  body.manager-dark #managerView .inventory-migration-notice:not(.hidden) { color:#ffdb8b; background:#382f1d; border-color:#655229; }
+
   @media (max-width: 640px) {
     #managerView { padding-left:0.85rem; padding-right:0.85rem; }
+    .manager-topbar-shell { margin-top:.75rem; padding:0 .85rem; }
+    .manager-topbar-shell .manager-topbar { align-items:stretch; flex-direction:column; gap:.55rem; padding:.75rem; }
+    .manager-topbar-brand { align-self:flex-start; }
+    .manager-tabs { width:100%; }
+    .manager-tab { padding:.58rem .68rem; font-size:.72rem; }
+    .manager-topbar-actions { justify-content:flex-end; }
+    .manager-nav-user { margin-right:auto; }
+    #managerView .manager-section-heading { align-items:flex-start; flex-direction:column; }
+    #managerView .manager-section-heading h2 { font-size:1.25rem; }
+    #managerView .analytics-summary.vendor-summary,
+    #managerView .analytics-summary.inventory-summary,
+    #managerView .analytics-summary.lottery-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    #managerView .overview-summary,
+    #managerView .vendor-summary,
+    #managerView .inventory-summary,
+    #managerView .lottery-summary { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem; }
+    #managerView .calendar-grid { gap:.15rem; }
+    #managerView .calendar-day { min-height:2.9rem; padding:.28rem; font-size:.62rem; }
+    #managerView .calendar-day strong { font-size:.58rem; }
+    #managerView .inventory-count-form > div,
+    #managerView .inventory-count-form .inventory-count-notes { flex:1 1 100%; }
+    #managerView .vendor-pie-wrap { width:min(100%,22rem); height:15rem; flex:0 1 22rem; }
     #managerView .analytics-controls { gap:0.5rem; }
     #managerView .analytics-controls input[type="date"] { min-width:0; flex:1; }
     #managerView .analytics-summary { grid-template-columns: repeat(2, minmax(0,1fr)); gap:0.6rem; }

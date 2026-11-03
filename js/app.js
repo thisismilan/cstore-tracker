@@ -8,8 +8,11 @@ const TABLE_NAME = "daily_reports";
 let currentEditingId = null;
 let cameFromManager = false;
 let currentReports = [];
+let inventoryCounts = [];
+let inventoryHistoryReports = [];
+let inventoryHistoryCounts = [];
+let inventoryCountTableAvailable = null;
 let calYear, calMonth;
-let tableYear, tableMonth;
 let empCalMonth, empCalYear;
 
 /* =========================================================
@@ -31,6 +34,7 @@ const loginScreen = document.getElementById("loginScreen");
 const topNav = document.getElementById("topNav");
 const employeeView = document.getElementById("employeeView");
 const managerView = document.getElementById("managerView");
+const managerTopbarShell = document.getElementById("managerTopbarShell");
 const vendorView = document.getElementById("vendorView");
 const navUserInfo = document.getElementById("navUserInfo");
 const navRoleBadge = document.getElementById("navRoleBadge");
@@ -58,30 +62,35 @@ function validateLogin(name, role, password) {
 async function applySession(name, role) {
   navUserInfo.textContent = `Signed in as ${name}`;
   navRoleBadge.textContent = role;
+  document.getElementById("managerNavUserInfo").textContent = `Signed in as ${name}`;
   loginScreen.classList.add("hidden");
-  topNav.classList.remove("hidden");
+  topNav.classList.toggle("hidden", role === "manager");
+  managerTopbarShell.classList.toggle("hidden", role !== "manager");
+  if (role === "manager") {
+    document.body.classList.toggle("manager-dark", localStorage.getItem("managerTheme") === "dark");
+    updateManagerThemeButton();
+  } else {
+    document.body.classList.remove("manager-dark");
+  }
   vendorView.classList.add("hidden"); // Hide vendor view on login
 
-  // Show Manage Vendors button for employee and manager
-  const vendorMgmtBtn = document.getElementById("vendorMgmtBtn");
-  if (role === "employee" || role === "manager") {
-    vendorMgmtBtn.classList.remove("hidden");
+  // Employee keeps Manage Vendors in the global navigation. Managers access it from the Vendors tab.
+  const employeeVendorMgmtBtn = document.getElementById("vendorMgmtBtnEmployee");
+  if (role === "employee") {
+    employeeVendorMgmtBtn.classList.remove("hidden");
     // Load vendors from Supabase when logging in
     loadVendorsFromSupabase();
   } else {
-    vendorMgmtBtn.classList.add("hidden");
+    employeeVendorMgmtBtn.classList.add("hidden");
+    if (role === "manager") loadVendorsFromSupabase();
   }
 
   if (role === "manager") {
     managerView.classList.remove("hidden");
     employeeView.classList.add("hidden");
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    document.getElementById("filterStart").valueAsDate = firstDayOfMonth;
-    document.getElementById("filterEnd").valueAsDate = today;
+    setPeriod("current");
     console.log("Manager login - calling loadDashboardData");
     loadDashboardData().catch(err => console.error("loadDashboardData failed:", err));
-    renderCalendar();
   } else if (role === "employee") {
     employeeView.classList.remove("hidden");
     managerView.classList.add("hidden");
@@ -122,6 +131,25 @@ document.getElementById("loginForm").addEventListener("submit", (e) => {
 document.getElementById("logoutBtn").addEventListener("click", () => {
   sessionStorage.removeItem("cstore_user");
   location.reload();
+});
+
+document.getElementById("managerLogoutBtn").addEventListener("click", () => {
+  sessionStorage.removeItem("cstore_user");
+  location.reload();
+});
+
+function updateManagerThemeButton() {
+  const button = document.getElementById("managerThemeToggle");
+  const darkMode = document.body.classList.contains("manager-dark");
+  button.textContent = darkMode ? "☀" : "◐";
+  button.setAttribute("aria-label", darkMode ? "Switch to light mode" : "Switch to dark mode");
+  button.title = darkMode ? "Switch to light mode" : "Switch to dark mode";
+}
+
+document.getElementById("managerThemeToggle").addEventListener("click", () => {
+  const darkMode = document.body.classList.toggle("manager-dark");
+  localStorage.setItem("managerTheme", darkMode ? "dark" : "light");
+  updateManagerThemeButton();
 });
 
 (function restoreSession() {
@@ -345,7 +373,6 @@ function recalcSales() {
   // Grand total for the Settlements & Cash column
   const grandTotalSettlements = settlement1 + settlement2 + lotteryPayout + totalCashPayout + cashInHand;
 
-  document.getElementById("grandTotalSales").textContent = "$" + grandTotalSales.toFixed(2);
   document.getElementById("grandTotalSettlements").textContent = "$" + grandTotalSettlements.toFixed(2);
 
   // Over/Short = Grand Total Settlements & Cash - Grand Total Sales
@@ -487,6 +514,47 @@ function recalcPurchases() {
   document.getElementById("purchasesTotal").textContent = total.toFixed(2);
 }
 
+async function getInventoryBeforeDate(dateStr) {
+  const [reportResult, countResult] = await Promise.all([
+    supabaseClient
+      .from(TABLE_NAME)
+      .select("date, total_sales, purchases_total, retail_purchased, current_inventory")
+      .lt("date", dateStr)
+      .order("date", { ascending: false })
+      .limit(1),
+    supabaseClient
+      .from("inventory_counts")
+      .select("count_date, physical_inventory")
+      .lt("count_date", dateStr)
+      .order("count_date", { ascending: false })
+      .limit(1)
+  ]);
+  if (reportResult.error) throw reportResult.error;
+  if (countResult.error && !/inventory_counts|schema cache|does not exist/i.test(countResult.error.message)) throw countResult.error;
+
+  const latestReport = reportResult.data?.[0] || null;
+  const latestCount = countResult.error ? null : (countResult.data?.[0] || null);
+  if (latestCount && (!latestReport || latestCount.count_date >= latestReport.date)) {
+    const { data: reportsAfterCount, error } = await supabaseClient
+      .from(TABLE_NAME)
+      .select("date, total_sales, purchases_total, retail_purchased")
+      .gt("date", latestCount.count_date)
+      .lt("date", dateStr)
+      .order("date", { ascending: true });
+    if (error) throw error;
+    return (reportsAfterCount || []).reduce((inventory, report) => {
+      const retailPurchased = parseFloat(report.retail_purchased) ||
+        ((parseFloat(report.purchases_total) || 0) / 0.67);
+      return inventory + retailPurchased - (parseFloat(report.total_sales) || 0);
+    }, parseFloat(latestCount.physical_inventory) || 0);
+  }
+
+  if (latestReport && Number.isFinite(parseFloat(latestReport.current_inventory))) {
+    return parseFloat(latestReport.current_inventory);
+  }
+  return 100000;
+}
+
 document.getElementById("addPurchaseRow").addEventListener("click", () => createPurchaseRow());
 createPurchaseRow(); // default purchase row 1
 createPurchaseRow(); // default purchase row 2
@@ -528,26 +596,19 @@ document.getElementById("dailyReportForm").addEventListener("submit", async (e) 
   const grandTotalSettlements = settlement1 + settlement2 + lotteryPayout + totalCashPayout + cashInHand;
   // Over/Short = Grand Total Settlements & Cash - Grand Total Sales
   const overShort = grandTotalSettlements - grandTotalSales;
-// INVENTORY TRACKING: Current Inventory = Last Inventory + Retail Purchases - Daily Sales
-  // Starting inventory: $100,000 on Oct 1, 2026
-  const startingInventory = 100000;
-  const startDate = new Date("2026-10-01");
-  const reportDate = new Date(document.getElementById("reportDate").value);
-  const daysSinceStart = Math.max(0, Math.floor((reportDate - startDate) / (1000 * 60 * 60 * 24)));
-  
-  // Get last known inventory from sessionStorage or use starting value
-  let lastInventory = startingInventory;
-  if (daysSinceStart > 0) {
-    const savedInventory = sessionStorage.getItem("cstore_current_inventory");
-    if (savedInventory) lastInventory = parseFloat(savedInventory);
+  // Inventory begins from the latest saved report/count before this report date.
+  let lastInventory;
+  try {
+    lastInventory = await getInventoryBeforeDate(document.getElementById("reportDate").value);
+  } catch (inventoryError) {
+    console.error("Could not calculate inventory before report date:", inventoryError);
+    showToast("Could not calculate running inventory. Please retry.", "error");
+    return;
   }
-  
+
   const retailPurchased = purchasesTotal / 0.67; // Convert retail purchase to inventory value
   const dailySales = totalSales; // Retail sales amount
   const newCurrentInventory = lastInventory + retailPurchased - dailySales;
-  
-  // Save for next day's calculation
-  sessionStorage.setItem("cstore_current_inventory", newCurrentInventory.toFixed(2));
   
   const payload = {
     date: document.getElementById("reportDate").value,
@@ -731,7 +792,6 @@ async function backToDashboard() {
 
     // Reload dashboard data (await to ensure completion)
     await loadDashboardData();
-    renderCalendar();
 
     // Update back button visibility
     updateBackButtonVisibility();
@@ -817,19 +877,68 @@ async function loadReportsData() {
    MANAGER DASHBOARD
    ========================================================= */
 let salesLineChart, vendorPieChart, inventoryLineChart;
-let vendorViewYear, vendorViewMonth;
+let overviewVendorPieChart;
 
+const managerTabDescriptions = {
+  overview: ["Overview", "Sales, inventory and vendor performance for your selected period."],
+  vendors: ["Vendors", "Sales, purchases and profit margin for the selected date range."],
+  inventory: ["Inventory", "Running inventory estimate and dated physical counts."],
+  reports: ["Daily Reports", "Review, edit or delete reports in the selected date range."],
+  lottery: ["Lottery", "Lottery and lotto performance for the selected date range."]
+};
+
+function setManagerTab(tabName) {
+  const knownTab = managerTabDescriptions[tabName] ? tabName : "overview";
+  document.querySelectorAll("[data-manager-tab]").forEach(button => {
+    const active = button.dataset.managerTab === knownTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  document.querySelectorAll(".manager-tab-panel").forEach(panel => {
+    const active = panel.id === `managerTab-${knownTab}`;
+    panel.classList.toggle("active", active);
+    panel.hidden = !active;
+  });
+  requestAnimationFrame(() => {
+    [salesLineChart, inventoryLineChart, vendorPieChart, overviewVendorPieChart]
+      .filter(Boolean)
+      .forEach(chart => chart.resize());
+  });
+}
+
+document.querySelectorAll("[data-manager-tab]").forEach(button => {
+  button.addEventListener("click", () => setManagerTab(button.dataset.managerTab));
+});
+
+/* Human-readable label for the selected period, e.g. "11/01/2026 – 11/03/2026" */
+function getPeriodLabel(start, end) {
+  if (!start || !end) return "";
+  const fmt = (iso) => {
+    const [y, m, d] = iso.split("-");
+    return `${m}/${d}/${y}`;
+  };
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+
+/* ---- Loads every section (cards, charts, table, vendors, calendar) for the top period ---- */
 async function loadDashboardData() {
-  console.log("=== loadDashboardData START ===");
-  const start = document.getElementById("filterStart")?.value || "";
-  const end = document.getElementById("filterEnd")?.value || "";
-  console.log("Filter dates:", { start, end });
+  const start = document.getElementById("filterStart").value;
+  const end = document.getElementById("filterEnd").value;
+  if (!start || !end) {
+    showToast("Please choose both a start and end date", "error");
+    return;
+  }
+  if (start > end) {
+    showToast("Start date must be before end date", "error");
+    return;
+  }
 
-  let query = supabaseClient.from(TABLE_NAME).select("*").order("date", { ascending: true });
-  if (start) query = query.gte("date", start);
-  if (end) query = query.lte("date", end);
-
-  const { data, error } = await query;
+  const { data, error } = await supabaseClient
+    .from(TABLE_NAME)
+    .select("*")
+    .gte("date", start)
+    .lte("date", end)
+    .order("date", { ascending: true });
 
   if (error) {
     console.error("Dashboard load error:", error);
@@ -837,32 +946,71 @@ async function loadDashboardData() {
     return;
   }
 
-  console.log("Loaded reports count:", data?.length || 0);
-  console.log("First report:", data?.[0]);
+  // Comparison period for the % change figures on the summary cards
+  const compare = getComparisonRange(start, end);
+  const { data: prevData, error: prevError } = await supabaseClient
+    .from(TABLE_NAME)
+    .select("*")
+    .gte("date", compare.start)
+    .lte("date", compare.end);
+  if (prevError) console.error("Comparison load error:", prevError);
 
   currentReports = data || [];
-  // Initialize table month/year to current month if not already set
-  if (!tableYear || !tableMonth) {
-    const now = new Date();
-    tableYear = now.getFullYear();
-    tableMonth = now.getMonth();
+  const countsResult = await supabaseClient
+    .from("inventory_counts")
+    .select("*")
+    .gte("count_date", start)
+    .lte("count_date", end)
+    .order("count_date", { ascending: true });
+  inventoryCounts = countsResult.error ? [] : (countsResult.data || []);
+  inventoryCountTableAvailable = !countsResult.error;
+  const migrationNotice = document.getElementById("inventoryMigrationNotice");
+  if (migrationNotice) {
+    const migrationMissing = countsResult.error && /inventory_counts|schema cache|does not exist/i.test(countsResult.error.message);
+    migrationNotice.classList.toggle("hidden", !migrationMissing);
+    migrationNotice.textContent = migrationMissing
+      ? "Physical count saving is not set up yet. Run create_inventory_counts_table.sql in your Supabase SQL Editor, then reload the dashboard."
+      : "";
   }
-  console.log("Calling renderSummary...");
-  renderSummary(currentReports);
-  console.log("Calling renderCharts...");
-  renderCharts(currentReports);
-  console.log("Calling renderTable...");
+  if (countsResult.error && !/inventory_counts|schema cache|does not exist/i.test(countsResult.error.message)) console.error("Load physical inventory counts error:", countsResult.error);
+
+  const historyReportsResult = await supabaseClient
+    .from(TABLE_NAME)
+    .select("date, total_sales, purchases_total, retail_purchased, current_inventory")
+    .lte("date", end)
+    .order("date", { ascending: true });
+  inventoryHistoryReports = historyReportsResult.error ? currentReports : (historyReportsResult.data || []);
+
+  const historyCountsResult = await supabaseClient
+    .from("inventory_counts")
+    .select("count_date, physical_inventory, system_inventory, variance, notes")
+    .lte("count_date", end)
+    .order("count_date", { ascending: true });
+  inventoryHistoryCounts = historyCountsResult.error ? inventoryCounts : (historyCountsResult.data || []);
+  inventoryCounts = inventoryHistoryCounts;
+
+  // The calendar shows the month the selected period starts in; other panels
+  // continue to use the complete shared date range.
+  const startDate = parseISODate(start);
+  calYear = startDate.getFullYear();
+  calMonth = startDate.getMonth();
+
+  renderSummary(currentReports, prevData || [], compare.label);
+  renderCharts(currentReports, inventoryHistoryReports, inventoryHistoryCounts);
   renderTable(currentReports);
-  console.log("Calling renderCalendar...");
   renderCalendar();
-  console.log("Calling renderVendorList...");
-  renderVendorList();
-  // Update table month label
-  const tableMonthLabel = document.getElementById("tableMonthLabel");
-  if (tableMonthLabel) {
-    tableMonthLabel.textContent = new Date(tableYear, tableMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  }
-  console.log("=== loadDashboardData END ===");
+  renderVendorList("vendorList");
+  renderVendorList("overviewVendorList");
+  renderVendorMetrics(currentReports);
+  renderLotteryMetrics(currentReports);
+  renderInventoryPanel(inventoryHistoryReports, inventoryHistoryCounts, start, end);
+
+  const periodLabel = getPeriodLabel(start, end);
+  document.getElementById("activePeriodText").textContent = periodLabel;
+  document.getElementById("tableMonthLabel").textContent = periodLabel;
+  document.getElementById("vendorMonthLabel").textContent = periodLabel;
+  document.getElementById("reportsPeriodHeading").textContent = periodLabel;
+  document.getElementById("inventoryHistoryRange").textContent = periodLabel;
 }
 
 function formatDate(dateStr) {
@@ -874,42 +1022,59 @@ function formatDate(dateStr) {
   return `${month}-${day}-${year}`; // mm-dd-yyyy format
 }
 
-function renderSummary(reports) {
+function calculateInventoryEstimate(dateStr, reports = currentReports, counts = inventoryCounts, includeReportOnCountDate = false) {
+  const sortedReports = reports
+    .filter(report => report && report.date && report.date <= dateStr)
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const sortedCounts = counts
+    .filter(count => count && count.count_date <= dateStr)
+    .slice()
+    .sort((a, b) => a.count_date.localeCompare(b.count_date));
+  const latestCount = sortedCounts[sortedCounts.length - 1];
+  const latestReport = sortedReports[sortedReports.length - 1];
+
+  if (latestCount) {
+    const laterReports = sortedReports.filter(report =>
+      report.date > latestCount.count_date || (includeReportOnCountDate && report.date === dateStr)
+    );
+    return laterReports.reduce((inventory, report) => {
+      const retailPurchased = parseFloat(report.retail_purchased) ||
+        ((parseFloat(report.purchases_total) || 0) / 0.67);
+      return inventory + retailPurchased - (parseFloat(report.total_sales) || 0);
+    }, parseFloat(latestCount.physical_inventory) || 0);
+  }
+
+  if (latestReport && Number.isFinite(parseFloat(latestReport.current_inventory))) {
+    return parseFloat(latestReport.current_inventory);
+  }
+
+  const openingDate = "2026-10-01";
+  if (dateStr < openingDate) return 100000;
+  return sortedReports.reduce((inventory, report) => {
+    const retailPurchased = parseFloat(report.retail_purchased) ||
+      ((parseFloat(report.purchases_total) || 0) / 0.67);
+    return inventory + retailPurchased - (parseFloat(report.total_sales) || 0);
+  }, 100000);
+}
+
+function renderSummary(reports, prevReports, compareLabel) {
   // Filter out null entries to prevent "Cannot read properties of null" errors
   const validReports = reports.filter(r => r != null);
   const totalSales = validReports.reduce((s, r) => s + (parseFloat(r.total_sales) || 0), 0);
-  const totalOverShort = validReports.reduce((s, r) => s + (parseFloat(r.over_short) || 0), 0);
   const totalPurchases = validReports.reduce((s, r) => s + (parseFloat(r.purchases_total) || 0), 0);
   const avgSales = validReports.length ? totalSales / validReports.length : 0;
-  // Current Inventory = Starting ($100k) + Cumulative Retail Purchases - Cumulative Sales
-  const cumulativeRetailPurchases = validReports.reduce((s, r) => s + ((parseFloat(r.purchases_total) || 0) / 0.67), 0);
-  const currentInventory = 100000 + cumulativeRetailPurchases - totalSales;
+  const selectedEnd = document.getElementById("filterEnd").value;
+  const currentInventory = selectedEnd
+    ? calculateInventoryEstimate(selectedEnd, inventoryHistoryReports, inventoryHistoryCounts)
+    : 100000;
 
-  // % change vs last calendar month (1st to last day of each month)
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth(); // 0-11
-
-  const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-  const lastMonthIndex = currentMonth === 0 ? 11 : currentMonth - 1;
-
-  const startOfThisMonth = new Date(currentYear, currentMonth, 1);
-  const endOfThisMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
-
-  const startOfLastMonth = new Date(lastMonthYear, lastMonthIndex, 1);
-  const endOfLastMonth = new Date(lastMonthYear, lastMonthIndex + 1, 0, 23, 59, 59);
-
-  const inMonth = (r, start, end) => {
-    const d = new Date((r.date || "") + "T00:00:00");
-    return d >= start && d <= end;
-  };
-
-  const thisMonthReports = reports.filter(r => inMonth(r, startOfThisMonth, endOfThisMonth));
-  const lastMonthReports = reports.filter(r => inMonth(r, startOfLastMonth, endOfLastMonth));
+  // % change compares the selected period with the comparison period (see getComparisonRange)
+  const lastMonthReports = prevReports.filter(r => r != null);
 
   const lastTotalSales = lastMonthReports.reduce((s, r) => s + (parseFloat(r.total_sales) || 0), 0);
-  const lastTotalPurchases = lastMonthReports.reduce((s, r) => s + (parseFloat(r.purchases_total) || 0), 0);
   const lastAvgSales = lastMonthReports.length ? lastTotalSales / lastMonthReports.length : 0;
+  const lastTotalPurchases = lastMonthReports.reduce((s, r) => s + (parseFloat(r.purchases_total) || 0), 0);
 
   const pct = (cur, prev) => {
     if (!prev) return null;
@@ -932,13 +1097,13 @@ function renderSummary(reports) {
       return;
     }
     const sign = p >= 0 ? "+" : "";
-    el.textContent = ` ${sign}${p.toFixed(0)}% vs last month`;
+    el.textContent = ` ${sign}${p.toFixed(0)}% ${compareLabel}`;
     el.classList.toggle("text-green-600", p >= 0);
     el.classList.toggle("text-red-600", p < 0);
   });
 
-  // Hide change elements for other stats (Over/Short, Current Inventory, Reports)
-  const hideIds = ["sumOverShortChange", "sumCurrentInventoryChange", "sumCountChange"];
+  // Hide change elements for inventory, which is an end-of-period balance.
+  const hideIds = ["sumCurrentInventoryChange"];
   hideIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -949,14 +1114,141 @@ function renderSummary(reports) {
 
   // Update stat values
   document.getElementById("sumTotalSales").textContent = "$" + totalSales.toFixed(2);
-  document.getElementById("sumOverShort").textContent = "$" + totalOverShort.toFixed(2);
   document.getElementById("sumPurchases").textContent = "$" + totalPurchases.toFixed(2);
   document.getElementById("sumAvgSales").textContent = "$" + avgSales.toFixed(2);
-  document.getElementById("sumCount").textContent = reports.length;
   document.getElementById("sumCurrentInventory").textContent = "$" + currentInventory.toFixed(2);
 }
 
-function renderCharts(reports) {
+function renderVendorMetrics(reports) {
+  const validReports = reports.filter(report => report != null);
+  const totalSales = validReports.reduce((sum, report) => sum + (parseFloat(report.total_sales) || 0), 0);
+  const totalPurchases = validReports.reduce((sum, report) => sum + (parseFloat(report.purchases_total) || 0), 0);
+  const profitMargin = totalSales > 0 ? ((totalSales - totalPurchases) / totalSales) * 100 : null;
+  document.getElementById("vendorsTotalSales").textContent = `$${totalSales.toFixed(2)}`;
+  document.getElementById("vendorsTotalPurchases").textContent = `$${totalPurchases.toFixed(2)}`;
+  document.getElementById("vendorsProfitMargin").textContent = profitMargin === null ? "—" : `${profitMargin.toFixed(2)}%`;
+}
+
+function renderLotteryMetrics(reports) {
+  const validReports = reports.filter(report => report != null);
+  const sum = field => validReports.reduce((total, report) => total + (parseFloat(report[field]) || 0), 0);
+  document.getElementById("lotteryTotalSales").textContent = `$${sum("lottery_actual").toFixed(2)}`;
+  document.getElementById("lottoTotalSales").textContent = `$${sum("lotto_actual").toFixed(2)}`;
+  const combinedLotterySales = sum("lottery_actual") + sum("lotto_actual");
+  document.getElementById("lotteryOverallSales").textContent = `$${combinedLotterySales.toFixed(2)}`;
+  document.getElementById("lotteryPayoutTotal").textContent = `$${sum("lottery_payout").toFixed(2)}`;
+}
+
+function renderInventoryPanel(reports, counts, start, end) {
+  const endInventory = calculateInventoryEstimate(end, reports, counts);
+  const latestCount = counts
+    .filter(count => count.count_date <= end)
+    .slice()
+    .sort((a, b) => b.count_date.localeCompare(a.count_date))[0];
+
+  document.getElementById("inventoryRunningValue").textContent = `$${endInventory.toFixed(2)}`;
+  document.getElementById("inventoryAsOf").textContent = `System estimate as of ${formatDate(end)}`;
+  document.getElementById("inventoryPhysicalValue").textContent = latestCount
+    ? `$${(parseFloat(latestCount.physical_inventory) || 0).toFixed(2)}`
+    : "—";
+  document.getElementById("inventoryPhysicalDate").textContent = latestCount
+    ? `Counted ${formatDate(latestCount.count_date)}`
+    : "No physical count recorded in this period";
+
+  const tableBody = document.getElementById("inventoryCountsBody");
+  const visibleCounts = counts
+    .filter(count => count.count_date >= start && count.count_date <= end)
+    .slice()
+    .sort((a, b) => b.count_date.localeCompare(a.count_date));
+
+  if (!visibleCounts.length) {
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-slate-400 py-5">No physical counts recorded in this date range.</td></tr>';
+    return;
+  }
+
+  tableBody.innerHTML = visibleCounts.map(count => {
+    const variance = parseFloat(count.variance) || 0;
+    const varianceClass = variance < 0 ? "text-red-600" : "text-green-600";
+    const varianceLabel = variance < 0 ? "Short" : "Over";
+    return `<tr class="border-b border-slate-100">
+      <td class="py-2 pr-4">${formatDate(count.count_date)}</td>
+      <td class="py-2 pr-4">$${(parseFloat(count.physical_inventory) || 0).toFixed(2)}</td>
+      <td class="py-2 pr-4">$${(parseFloat(count.system_inventory) || 0).toFixed(2)}</td>
+      <td class="py-2 pr-4 ${varianceClass} font-semibold">${variance < 0 ? "-" : "+"}$${Math.abs(variance).toFixed(2)} ${varianceLabel}</td>
+      <td class="py-2 pr-4 text-slate-500">${escapeHTML(count.notes || "")}</td>
+    </tr>`;
+  }).join("");
+}
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[character]);
+}
+
+document.getElementById("inventoryCountForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const countDate = document.getElementById("inventoryCountDate").value;
+  const physicalInventory = parseFloat(document.getElementById("inventoryCountAmount").value);
+  const notes = document.getElementById("inventoryCountNotes").value.trim();
+  if (!countDate || !Number.isFinite(physicalInventory) || physicalInventory < 0) {
+    showToast("Enter a valid count date and non-negative inventory amount", "error");
+    return;
+  }
+  if (inventoryCountTableAvailable === false) {
+    showToast("Run create_inventory_counts_table.sql in Supabase before saving counts", "error");
+    return;
+  }
+
+  const submitButton = document.getElementById("saveInventoryCountBtn");
+  submitButton.disabled = true;
+  try {
+    const [reportHistoryResult, countsHistoryResult] = await Promise.all([supabaseClient
+      .from(TABLE_NAME)
+      .select("date, total_sales, purchases_total, retail_purchased, current_inventory")
+      .lte("date", countDate)
+      .order("date", { ascending: true }),
+    supabaseClient
+      .from("inventory_counts")
+      .select("count_date, physical_inventory")
+      .lt("count_date", countDate)
+      .order("count_date", { ascending: true })]);
+    if (reportHistoryResult.error) throw reportHistoryResult.error;
+    if (countsHistoryResult.error && !/inventory_counts|schema cache|does not exist/i.test(countsHistoryResult.error.message)) {
+      throw countsHistoryResult.error;
+    }
+    const countsBeforeDate = countsHistoryResult.error ? [] : (countsHistoryResult.data || []);
+    const systemInventory = calculateInventoryEstimate(countDate, reportHistoryResult.data || [], countsBeforeDate, true);
+    const variance = physicalInventory - systemInventory;
+    const { error } = await supabaseClient
+      .from("inventory_counts")
+      .upsert({
+        count_date: countDate,
+        physical_inventory: physicalInventory,
+        system_inventory: systemInventory,
+        variance,
+        notes
+      }, { onConflict: "count_date" });
+    if (error) throw error;
+
+    showToast(`Physical count saved. ${variance < 0 ? "Short" : "Over"} by $${Math.abs(variance).toFixed(2)}.`);
+    document.getElementById("inventoryCountForm").reset();
+    await loadDashboardData();
+  } catch (error) {
+    console.error("Save physical inventory count error:", error);
+    if (/inventory_counts|schema cache|does not exist/i.test(error.message || "")) {
+      inventoryCountTableAvailable = false;
+      const notice = document.getElementById("inventoryMigrationNotice");
+      notice.textContent = "Physical count saving is not set up yet. Run create_inventory_counts_table.sql in your Supabase SQL Editor, then reload the dashboard.";
+      notice.classList.remove("hidden");
+    }
+    showToast("Could not save physical count: " + error.message, "error");
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+function renderCharts(reports, historyReports = reports, historyCounts = inventoryCounts) {
   // Filter out null entries to prevent "Cannot read properties of null" errors
   const validReports = reports.filter(r => r != null);
   const labels = validReports.map(r => r.date);
@@ -974,6 +1266,7 @@ function renderCharts(reports) {
 
   if (salesLineChart) salesLineChart.destroy();
   if (vendorPieChart) vendorPieChart.destroy();
+  if (overviewVendorPieChart) overviewVendorPieChart.destroy();
   if (inventoryLineChart) inventoryLineChart.destroy();
 
   salesLineChart = new Chart(document.getElementById("salesLineChart"), {
@@ -981,8 +1274,10 @@ function renderCharts(reports) {
     data: {
       labels,
       datasets: [{
-        label: "Cumulative Total Sales ($)",
-        data: reports.map((r, i) => reports.slice(0, i + 1).reduce((s, rr) => s + (parseFloat(rr.total_sales) || 0), 0)),
+        label: "Total Sales ($)",
+        data: validReports.map((report, index) =>
+          validReports.slice(0, index + 1).reduce((total, item) => total + (parseFloat(item.total_sales) || 0), 0)
+        ),
         borderColor: "#1d4ed8",
         backgroundColor: "rgba(29,78,216,0.1)",
         tension: 0.3,
@@ -998,7 +1293,7 @@ function renderCharts(reports) {
       labels,
       datasets: [{
         label: "Current Inventory ($)",
-        data: reports.map(r => 100000 + reports.slice(0, reports.indexOf(r) + 1).reduce((s, rr) => s + ((parseFloat(rr.purchases_total) || 0) / 0.67), 0) - reports.slice(0, reports.indexOf(r) + 1).reduce((s, rr) => s + (parseFloat(rr.total_sales) || 0), 0)),
+        data: validReports.map(r => calculateInventoryEstimate(r.date, historyReports, historyCounts)),
         borderColor: "#16a34a",
         backgroundColor: "rgba(22,163,74,0.1)",
         tension: 0.3,
@@ -1008,7 +1303,7 @@ function renderCharts(reports) {
     options: { responsive: true, plugins: { legend: { display: false } } }
   });
 
-  vendorPieChart = new Chart(document.getElementById("vendorPieChart"), {
+  const vendorChartConfig = {
     type: "doughnut",
     data: {
       labels: vendorLabels,
@@ -1017,7 +1312,34 @@ function renderCharts(reports) {
         backgroundColor: ["#1d4ed8","#16a34a","#dc2626","#ca8a04","#9333ea","#0891b2","#ea580c","#4b5563"]
       }]
     },
-    options: { responsive: true }
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        // The adjacent vendor list already provides the legend; keeping a
+        // second wrapped legend can squeeze the doughnut into an ellipse.
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label(context) {
+              const amount = Number(context.parsed) || 0;
+              return `${context.label}: ${new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD"
+              }).format(amount)}`;
+            }
+          }
+        }
+      }
+    }
+  };
+  vendorPieChart = new Chart(document.getElementById("vendorPieChart"), vendorChartConfig);
+  overviewVendorPieChart = new Chart(document.getElementById("overviewVendorPieChart"), {
+    ...vendorChartConfig,
+    data: {
+      ...vendorChartConfig.data,
+      datasets: vendorChartConfig.data.datasets.map(dataset => ({ ...dataset }))
+    }
   });
 }
 
@@ -1031,14 +1353,9 @@ function renderTable(reports) {
     return;
   }
   tbody.innerHTML = "";
-  // Filter out null entries to prevent "Cannot read properties of null" errors
+  // Show every report in the selected period; filter out null entries first
   const validReports = reports.filter(r => r != null);
-  const filteredReports = validReports.filter(r => {
-    if (!tableYear || !tableMonth) return true;
-    const d = new Date((r.date || "") + "T00:00:00");
-    return d.getFullYear() === tableYear && d.getMonth() === tableMonth;
-  });
-  filteredReports.forEach(r => {
+  validReports.forEach(r => {
     const tr = document.createElement("tr");
     tr.className = "border-b border-slate-100 hover:bg-slate-50";
     tr.innerHTML = `
@@ -1081,7 +1398,6 @@ async function deleteReport(reportId, reportDate) {
     
     // Reload dashboard data
     loadDashboardData();
-    renderCalendar();
   } catch (err) {
     showToast('Error deleting report: ' + err.message, 'error');
   }
@@ -1094,41 +1410,44 @@ function renderCalendar() {
   const calGrid = document.getElementById("calendarGrid");
   calGrid.innerHTML = "";
   const calMonthYear = document.getElementById("calMonthYear");
-  const now = new Date();
-  const viewYear = calYear || now.getFullYear();
-  const viewMonth = calMonth ?? now.getMonth(); // 0-indexed, default to current month
-  calMonthYear.textContent = new Date(viewYear, viewMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-
-  const firstDay = new Date(viewYear, viewMonth, 1);
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const startDay = firstDay.getDay();
-  
+  const start = parseISODate(document.getElementById("filterStart").value);
+  const end = parseISODate(document.getElementById("filterEnd").value);
+  calMonthYear.textContent = getPeriodLabel(document.getElementById("filterStart").value, document.getElementById("filterEnd").value);
   const monthSales = {};
   const monthReportIds = {};
-  // Filter out null entries to prevent "Cannot read properties of null" errors
-  const validCurrentReports = currentReports.filter(r => r != null);
-  validCurrentReports.forEach(r => {
-    const d = new Date(r.date + "T00:00:00");
-    if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) {
-      const key = r.date;
-      monthSales[key] = (monthSales[key] || 0) + (parseFloat(r.total_sales) || 0);
-      monthReportIds[key] = r.id;
-    }
+  currentReports.filter(report => report != null).forEach(report => {
+    monthSales[report.date] = (monthSales[report.date] || 0) + (parseFloat(report.total_sales) || 0);
+    monthReportIds[report.date] = report.id;
   });
 
-  let html = "";
-  for (let i = 0; i < startDay; i++) html += `<div></div>`;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    const hasData = monthSales[dateStr] !== undefined;
-    const sales = monthSales[dateStr] || 0;
-    const reportId = monthReportIds[dateStr] || "";
-    const clickHandler = reportId 
-      ? `cameFromManager=true; editReport('${reportId}', '${dateStr}')`
-      : `switchToEmployeeDate('${dateStr}')`;
-    html += `<div class="p-2 rounded text-xs cursor-pointer hover:bg-blue-100 ${hasData ? "bg-blue-50 text-blue-900 font-semibold" : "text-slate-500"}" onclick="${clickHandler}">${d}<div class="text-[10px]">$${sales.toFixed(0)}</div></div>`;
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = [];
+  let monthCursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const lastMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+  while (monthCursor <= lastMonth) {
+    months.push(new Date(monthCursor));
+    monthCursor = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1);
   }
-  calGrid.innerHTML = html;
+
+  calGrid.innerHTML = months.map(monthDate => {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    let daysHtml = weekdays.map(day => `<div class="calendar-weekday">${day}</div>`).join("");
+    for (let blank = 0; blank < firstWeekday; blank++) daysHtml += '<div class="calendar-day calendar-day-empty"></div>';
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const dateIsSelected = dateStr >= document.getElementById("filterStart").value && dateStr <= document.getElementById("filterEnd").value;
+      const hasData = dateIsSelected && monthSales[dateStr] !== undefined;
+      const reportId = monthReportIds[dateStr];
+      const clickHandler = reportId
+        ? `cameFromManager=true; editReport('${reportId}', '${dateStr}')`
+        : `switchToEmployeeDate('${dateStr}')`;
+      daysHtml += `<button type="button" class="calendar-day ${dateIsSelected ? "calendar-day-selected" : "calendar-day-outside"} ${hasData ? "calendar-day-has-data" : ""}" onclick="${clickHandler}" ${dateIsSelected ? "" : "disabled"}><span>${day}</span><strong>${hasData ? `$${monthSales[dateStr].toFixed(0)}` : "—"}</strong></button>`;
+    }
+    return `<section class="calendar-month"><h4>${monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h4><div class="calendar-grid">${daysHtml}</div></section>`;
+  }).join("");
 }
 
 /* =========================================================
@@ -1201,83 +1520,127 @@ function setupZeroAutoClear() {
   });
 }
 
-document.getElementById("calPrevMonth").addEventListener("click", () => {
-  calMonth = (calMonth ?? (new Date().getMonth() - 1)) - 1;
-  if (calMonth < 0) { calMonth = 11; calYear = (calYear ?? new Date().getFullYear()) - 1; }
-  renderCalendar();
-});
 
-document.getElementById("calNextMonth").addEventListener("click", () => {
-  calMonth = (calMonth ?? (new Date().getMonth() - 1)) + 1;
-  if (calMonth > 11) { calMonth = 0; calYear = (calYear ?? new Date().getFullYear()) + 1; }
-  renderCalendar();
-});
 
-document.getElementById("tablePrevMonth").addEventListener("click", () => {
-  tableMonth = (tableMonth ?? (new Date().getMonth() - 1)) - 1;
-  if (tableMonth < 0) { tableMonth = 11; tableYear = (tableYear ?? new Date().getFullYear()) - 1; }
-  renderTable(currentReports);
-  const label = document.getElementById("tableMonthLabel");
-  if (label) label.textContent = new Date(tableYear, tableMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-});
 
-document.getElementById("tableNextMonth").addEventListener("click", () => {
-  tableMonth = (tableMonth ?? (new Date().getMonth() - 1)) + 1;
-  if (tableMonth > 11) { tableMonth = 0; tableYear = (tableYear ?? new Date().getFullYear()) + 1; }
-  renderTable(currentReports);
-  const label = document.getElementById("tableMonthLabel");
-  if (label) label.textContent = new Date(tableYear, tableMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-});
+function renderVendorList(elementId = "vendorList") {
+  const vendorListEl = document.getElementById(elementId);
+  if (!vendorListEl) return;
 
-function renderVendorList() {
-  const vendorListEl = document.getElementById("vendorList");
-  const vendorMonthLabel = document.getElementById("vendorMonthLabel");
-  const now = new Date();
-  const viewYear = vendorViewYear || now.getFullYear();
-  const viewMonth = vendorViewMonth ?? now.getMonth();
-  
-  vendorMonthLabel.textContent = new Date(viewYear, viewMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  
-  // Collect vendor totals for this month
+  // Collect vendor totals for every report in the selected period
   const vendorTotals = {};
   // Filter out null entries to prevent "Cannot read properties of null" errors
   const validCurrentReports = currentReports.filter(r => r != null);
   validCurrentReports.forEach(r => {
-    const d = new Date(r.date + "T00:00:00");
-    if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) {
-      (r.inventory_purchases || []).forEach(p => {
-        const vendor = p.vendor || "Unknown";
-        vendorTotals[vendor] = (vendorTotals[vendor] || 0) + (parseFloat(p.amount) || 0);
-      });
-    }
+    (r.inventory_purchases || []).forEach(p => {
+      const vendor = p.vendor || "Unknown";
+      vendorTotals[vendor] = (vendorTotals[vendor] || 0) + (parseFloat(p.amount) || 0);
+    });
   });
   
   // Sort by amount descending
   const sortedVendors = Object.entries(vendorTotals).sort((a, b) => b[1] - a[1]);
   
   if (sortedVendors.length === 0) {
-    vendorListEl.innerHTML = '<div class="p-4 text-slate-400 text-sm text-center">No purchases this month</div>';
+    vendorListEl.innerHTML = '<div class="p-4 text-slate-400 text-sm text-center">No purchases in this period</div>';
     return;
   }
   
   vendorListEl.innerHTML = sortedVendors.map(([vendor, amount]) => `
     <div class="flex justify-between items-center p-2 border-b border-slate-100 text-sm">
-      <span class="font-medium text-slate-800">${vendor}</span>
+      <span class="font-medium text-slate-800">${escapeHTML(vendor)}</span>
       <span class="font-bold text-slate-900">$${amount.toFixed(2)}</span>
     </div>
   `).join('');
 }
 
-document.getElementById("vendorPrevMonth").addEventListener("click", () => {
-  vendorViewMonth = (vendorViewMonth ?? (new Date().getMonth() - 1)) - 1;
-  if (vendorViewMonth < 0) { vendorViewMonth = 11; vendorViewYear = (vendorViewYear ?? new Date().getFullYear()) - 1; }
-  renderVendorList();
-});
 
-document.getElementById("vendorNextMonth").addEventListener("click", () => {
-  vendorViewMonth = (vendorViewMonth ?? (new Date().getMonth() - 1)) + 1;
-  if (vendorViewMonth > 11) { vendorViewMonth = 0; vendorViewYear = (vendorViewYear ?? new Date().getFullYear()) + 1; }
-  renderVendorList();
+
+/* ---- Period selection: Prev / Current / Next / Custom (one source for every section) ---- */
+// Declared as function declarations (not const) so they are safe to call during startup
+function toISODate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function parseISODate(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function monthRange(date) {
+  const first = new Date(date.getFullYear(), date.getMonth(), 1);
+  const last = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return { start: toISODate(first), end: toISODate(last) };
+}
+
+/* Comparison period for the % change figures: the previous calendar month when the
+   range is a full month, otherwise the same number of days immediately before it. */
+function getComparisonRange(start, end) {
+  const s = parseISODate(start);
+  const e = parseISODate(end);
+  const lastDayOfStartMonth = new Date(s.getFullYear(), s.getMonth() + 1, 0).getDate();
+  const isFullMonth =
+    s.getDate() === 1 &&
+    e.getFullYear() === s.getFullYear() &&
+    e.getMonth() === s.getMonth() &&
+    e.getDate() === lastDayOfStartMonth;
+
+  if (isFullMonth) {
+    return {
+      start: toISODate(new Date(s.getFullYear(), s.getMonth() - 1, 1)),
+      end: toISODate(new Date(s.getFullYear(), s.getMonth(), 0)),
+      label: "vs last month"
+    };
+  }
+
+  const days = Math.round((e - s) / 86400000) + 1;
+  return {
+    start: toISODate(new Date(s.getFullYear(), s.getMonth(), s.getDate() - days)),
+    end: toISODate(new Date(s.getFullYear(), s.getMonth(), s.getDate() - 1)),
+    label: "vs previous period"
+  };
+}
+
+function highlightPeriodButtons(mode) {
+  document.querySelectorAll(".period-btn").forEach(btn => {
+    const active = btn.dataset.period === mode;
+    btn.classList.toggle("bg-indigo-600", active);
+    btn.classList.toggle("text-white", active);
+    btn.classList.toggle("border-indigo-600", active);
+    btn.classList.toggle("bg-white", !active);
+    btn.classList.toggle("text-slate-700", !active);
+    btn.classList.toggle("border-slate-300", !active);
+  });
+}
+
+function setPeriod(period) {
+  const customRange = document.getElementById("customRange");
+  if (period === "custom") {
+    customRange.style.display = "flex";
+    highlightPeriodButtons("custom");
+    return;
+  }
+  customRange.style.display = "none";
+
+  let base = new Date();
+  if (period === "prev" || period === "next") {
+    // Move one month from the month currently shown in the Start Date
+    const shown = document.getElementById("filterStart").value;
+    if (shown) base = parseISODate(shown);
+    base = new Date(base.getFullYear(), base.getMonth() + (period === "next" ? 1 : -1), 1);
+  }
+
+  const range = monthRange(base);
+  document.getElementById("filterStart").value = range.start;
+  document.getElementById("filterEnd").value = range.end;
+  highlightPeriodButtons(period === "current" ? "current" : "none");
+}
+
+document.querySelectorAll(".period-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    setPeriod(btn.dataset.period);
+    if (btn.dataset.period !== "custom") loadDashboardData();
+  });
 });
 
 document.getElementById("applyFilterBtn").addEventListener("click", loadDashboardData);
