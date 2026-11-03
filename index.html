@@ -5,10 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>C-Store Daily Sales Tracker</title>
 
+<!-- Inter font (typography) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com"></script>
 <!-- Font Awesome for professional icons -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-ieTl2+6Qj+3JQHvlSqmwu6xRzXWUuU4P3J6I2Ha2pF/R2uIc0zlZ4XBwFcK/8pI7Jf6pC6gQpsqTgr8zQeH9aw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <!-- SheetJS -->
@@ -28,8 +32,8 @@
     </div>
     <div class="flex items-center gap-4">
       <span id="navUserInfo" class="text-sm text-slate-300"></span>
-      <span id="navRoleBadge" class="text-xs font-semibold px-2 py-1 rounded bg-indigo-600 uppercase"></span>
-      <button id="vendorMgmtBtnEmployee" onclick="openVendorView()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded hidden">Manage Vendors</button>
+      <span id="navRoleBadge" class="text-xs font-semibold px-2 py-1 rounded bg-blue-700 uppercase"></span>
+      <button id="vendorMgmtBtnEmployee" onclick="openVendorView()" class="bg-blue-700 hover:bg-blue-800 text-white text-sm px-3 py-1.5 rounded hidden">Manage Vendors</button>
       <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded">Logout</button>
     </div>
   </div>
@@ -277,7 +281,7 @@
     </div>
 
     <div>
-      <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold tracking-wide uppercase text-sm py-4 rounded shadow">
+      <button type="submit" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold tracking-wide uppercase text-sm py-4 rounded shadow">
         Submit Daily Report
       </button>
       <p class="report-footer-note text-center text-xs mt-3">Entries are saved securely. Past reports are not visible on this screen.</p>
@@ -286,7 +290,7 @@
 
   <!-- Sticky Submit Bar (shown when scrolled) -->
   <div id="stickySubmit" class="hidden">
-    <button type="button" onclick="document.getElementById('dailyReportForm').requestSubmit()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold tracking-wide uppercase text-sm py-4 px-6 rounded shadow w-full sm:w-auto">
+    <button type="button" onclick="document.getElementById('dailyReportForm').requestSubmit()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold tracking-wide uppercase text-sm py-4 px-6 rounded shadow w-full sm:w-auto">
       Submit Daily Report
     </button>
     <button id="stickyBackToDashboardBtn" type="button" onclick="backToDashboard()" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold text-sm py-4 px-6 rounded w-full sm:w-auto">
@@ -334,9 +338,9 @@
 
   <!-- Filters -->
   <div class="card p-4 analytics-controls flex flex-wrap items-end gap-4">
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="period-segment flex flex-wrap items-center">
       <button type="button" data-period="prev" class="period-btn px-4 py-2 rounded font-semibold text-sm border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">&larr; Prev Month</button>
-      <button type="button" data-period="current" class="period-btn px-4 py-2 rounded font-semibold text-sm border bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700">Current Month</button>
+      <button type="button" data-period="current" class="period-btn px-4 py-2 rounded font-semibold text-sm border bg-blue-700 text-white border-blue-700 hover:bg-blue-800">Current Month</button>
       <button type="button" data-period="next" class="period-btn px-4 py-2 rounded font-semibold text-sm border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">Next Month &rarr;</button>
       <button type="button" data-period="custom" class="period-btn px-4 py-2 rounded font-semibold text-sm border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">Custom</button>
     </div>
@@ -349,10 +353,10 @@
         <label class="block text-sm font-medium text-slate-700 mb-1">End Date</label>
         <input type="date" id="filterEnd" />
       </div>
-      <button id="applyFilterBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-semibold">Apply</button>
+      <button id="applyFilterBtn" class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold">Apply</button>
     </div>
     <span id="activePeriodText" class="text-sm font-semibold text-slate-800 self-center"></span>
-    <button id="exportExcelBtn" class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold">Export to Excel</button>
+    <button id="exportExcelBtn" class="ml-auto bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded font-semibold">Export to Excel</button>
   </div>
 
   <div class="manager-tab-panel active" id="managerTab-overview" role="tabpanel">
@@ -418,11 +422,11 @@
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="card p-4">
       <h3 class="font-semibold text-slate-700 mb-2">Total Sales Over Time</h3>
-      <canvas id="salesLineChart" height="180"></canvas>
+      <div class="chart-box"><canvas id="salesLineChart"></canvas></div>
     </div>
     <div class="card p-4">
       <h3 class="font-semibold text-slate-700 mb-2">Current Inventory Over Time</h3>
-      <canvas id="inventoryLineChart" height="180"></canvas>
+      <div class="chart-box"><canvas id="inventoryLineChart"></canvas></div>
     </div>
     <div class="card p-4 lg:col-span-2">
       <h3 class="font-semibold text-slate-700 mb-2">Purchases by Vendor</h3>
@@ -435,7 +439,7 @@
             <h4 class="text-sm font-medium text-slate-600">Vendor Purchase List</h4>
             <span id="vendorMonthLabel" class="text-sm font-semibold text-slate-800"></span>
           </div>
-          <div id="overviewVendorList" class="max-h-64 overflow-y-auto border border-slate-200 rounded"></div>
+          <div id="overviewVendorList" class="vendor-list-box"></div>
         </div>
       </div>
     </div>
@@ -444,7 +448,7 @@
   </div>
 
   <div class="manager-tab-panel" id="managerTab-vendors" role="tabpanel" hidden>
-    <div class="manager-section-heading"><div><h2>Vendors</h2><p>Sales, purchases and profit margin for the selected date range.</p></div><div class="flex items-center gap-3"><span class="manager-period-hint">Selected period</span><button type="button" id="managerVendorMgmtBtn" onclick="openVendorView()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-3 py-2 rounded">Manage Vendors</button></div></div>
+    <div class="manager-section-heading"><div><h2>Vendors</h2><p>Sales, purchases and profit margin for the selected date range.</p></div><div class="flex items-center gap-3"><span class="manager-period-hint">Selected period</span><button type="button" id="managerVendorMgmtBtn" onclick="openVendorView()" class="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-3 py-2 rounded">Manage Vendors</button></div></div>
     <div class="analytics-summary vendor-summary">
       <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-cash-register"></i></div><div class="stat-label">Total Sales</div></div><div id="vendorsTotalSales" class="stat-value">$0.00</div></div>
       <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-truck-fast"></i></div><div class="stat-label">Total Purchases</div></div><div id="vendorsTotalPurchases" class="stat-value">$0.00</div></div>
@@ -454,7 +458,7 @@
       <h3 class="font-semibold text-slate-700 mb-2">Purchases by Vendor</h3>
       <div class="flex flex-col md:flex-row gap-4 items-center">
         <div class="vendor-pie-wrap mx-auto"><canvas id="vendorPieChart"></canvas></div>
-        <div class="flex-1 w-full"><h4 class="text-sm font-medium text-slate-600 mb-2">Vendor Purchase List</h4><div id="vendorList" class="max-h-64 overflow-y-auto border border-slate-200 rounded"></div></div>
+        <div class="flex-1 w-full"><h4 class="text-sm font-medium text-slate-600 mb-2">Vendor Purchase List</h4><div id="vendorList" class="vendor-list-box"></div></div>
       </div>
     </div>
   </div>
@@ -472,7 +476,7 @@
         <div><label for="inventoryCountDate">Count date</label><input type="date" id="inventoryCountDate" required /></div>
         <div><label for="inventoryCountAmount">Physical inventory ($)</label><input type="number" id="inventoryCountAmount" min="0" step="0.01" required placeholder="0.00" /></div>
         <div class="inventory-count-notes"><label for="inventoryCountNotes">Notes (optional)</label><input type="text" id="inventoryCountNotes" maxlength="500" placeholder="e.g. Monthly shelf count" /></div>
-        <button type="submit" id="saveInventoryCountBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded">Save Physical Count</button>
+        <button type="submit" id="saveInventoryCountBtn" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold px-4 py-2 rounded">Save Physical Count</button>
       </form>
       <p class="text-xs text-slate-500 mt-3">Variance = physical count minus system estimate for that date. Positive is over; negative is short. Saving requires the inventory-count table migration in Supabase.</p>
       <p id="inventoryMigrationNotice" class="inventory-migration-notice hidden" role="status"></p>
@@ -595,7 +599,7 @@
             <input type="text" id="newRepNameEdit" placeholder="New representative" class="field-input w-full" />
             <input type="text" id="newPhoneEdit" placeholder="New phone" class="field-input w-full" />
           </div>
-          <button type="button" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-sm" onclick="editVendor()">Save Changes</button>
+          <button type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm" onclick="editVendor()">Save Changes</button>
         </div>
         
         <div>

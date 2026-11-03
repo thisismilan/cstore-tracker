@@ -150,6 +150,8 @@ document.getElementById("managerThemeToggle").addEventListener("click", () => {
   const darkMode = document.body.classList.toggle("manager-dark");
   localStorage.setItem("managerTheme", darkMode ? "dark" : "light");
   updateManagerThemeButton();
+  // Chart colors are set in JS, so redraw the charts with the new palette.
+  if (salesLineChart) renderCharts(currentReports, inventoryHistoryReports, inventoryHistoryCounts);
 });
 
 (function restoreSession() {
@@ -947,13 +949,17 @@ async function loadDashboardData() {
   }
 
   // Comparison period for the % change figures on the summary cards
-  const compare = getComparisonRange(start, end);
-  const { data: prevData, error: prevError } = await supabaseClient
-    .from(TABLE_NAME)
-    .select("*")
-    .gte("date", compare.start)
-    .lte("date", compare.end);
-  if (prevError) console.error("Comparison load error:", prevError);
+  const compare = getComparisonRange(start, end, data || []);
+  let prevData = [];
+  if (compare) {
+    const { data: comparisonData, error: prevError } = await supabaseClient
+      .from(TABLE_NAME)
+      .select("*")
+      .gte("date", compare.start)
+      .lte("date", compare.end);
+    if (prevError) console.error("Comparison load error:", prevError);
+    prevData = comparisonData || [];
+  }
 
   currentReports = data || [];
   const countsResult = await supabaseClient
@@ -995,7 +1001,7 @@ async function loadDashboardData() {
   calYear = startDate.getFullYear();
   calMonth = startDate.getMonth();
 
-  renderSummary(currentReports, prevData || [], compare.label);
+  renderSummary(currentReports, prevData, compare ? compare.label : "");
   renderCharts(currentReports, inventoryHistoryReports, inventoryHistoryCounts);
   renderTable(currentReports);
   renderCalendar();
@@ -1010,7 +1016,6 @@ async function loadDashboardData() {
   document.getElementById("tableMonthLabel").textContent = periodLabel;
   document.getElementById("vendorMonthLabel").textContent = periodLabel;
   document.getElementById("reportsPeriodHeading").textContent = periodLabel;
-  document.getElementById("inventoryHistoryRange").textContent = periodLabel;
 }
 
 function formatDate(dateStr) {
@@ -1082,9 +1087,9 @@ function renderSummary(reports, prevReports, compareLabel) {
   };
 
   const showChanges = {
-    sumTotalSalesChange: { cur: totalSales, prev: lastTotalSales },
-    sumPurchasesChange: { cur: totalPurchases, prev: lastTotalPurchases },
-    sumAvgSalesChange: { cur: avgSales, prev: lastAvgSales }
+    sumTotalSalesChange: { cur: totalSales, prev: lastTotalSales, neutral: false },
+    sumPurchasesChange: { cur: totalPurchases, prev: lastTotalPurchases, neutral: true },
+    sumAvgSalesChange: { cur: avgSales, prev: lastAvgSales, neutral: false }
   };
 
   Object.entries(showChanges).forEach(([id, vals]) => {
@@ -1096,10 +1101,13 @@ function renderSummary(reports, prevReports, compareLabel) {
       el.classList.remove("text-green-600", "text-red-600");
       return;
     }
-    const sign = p >= 0 ? "+" : "";
-    el.textContent = ` ${sign}${p.toFixed(0)}% ${compareLabel}`;
-    el.classList.toggle("text-green-600", p >= 0);
-    el.classList.toggle("text-red-600", p < 0);
+    // Arrow shows direction without relying on color. Purchases are neutral:
+    // a drop in purchases isn't necessarily bad, so it is not colored green/red.
+    const arrow = p >= 0 ? "▲" : "▼";
+    el.textContent = ` ${arrow} ${Math.abs(p).toFixed(0)}% ${compareLabel}`;
+    el.classList.toggle("text-green-600", !vals.neutral && p >= 0);
+    el.classList.toggle("text-red-600", !vals.neutral && p < 0);
+    el.classList.toggle("stat-change-neutral", !!vals.neutral);
   });
 
   // Hide change elements for inventory, which is an end-of-period balance.
@@ -1155,14 +1163,21 @@ function renderInventoryPanel(reports, counts, start, end) {
     ? `Counted ${formatDate(latestCount.count_date)}`
     : "No physical count recorded in this period";
 
+  // Physical Count History: entered counts for the last 12 calendar months, ending with
+  // the month the selected period ends in. Months with no entered count are not listed.
   const tableBody = document.getElementById("inventoryCountsBody");
+  const endDate = parseISODate(end);
+  const windowStart = toISODate(new Date(endDate.getFullYear(), endDate.getMonth() - 11, 1));
+  document.getElementById("inventoryHistoryRange").textContent =
+    `Last 12 months · ${formatDate(windowStart)} – ${formatDate(end)}`;
+
   const visibleCounts = counts
-    .filter(count => count.count_date >= start && count.count_date <= end)
+    .filter(count => count.count_date >= windowStart && count.count_date <= end)
     .slice()
     .sort((a, b) => b.count_date.localeCompare(a.count_date));
 
   if (!visibleCounts.length) {
-    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-slate-400 py-5">No physical counts recorded in this date range.</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-slate-400 py-5">No physical counts entered in the last 12 months.</td></tr>';
     return;
   }
 
@@ -1248,7 +1263,53 @@ document.getElementById("inventoryCountForm").addEventListener("submit", async e
   }
 });
 
+/* Chart colors follow the manager theme so axes, grid lines and labels stay readable in dark mode. */
+function getChartTheme() {
+  const dark = document.body.classList.contains("manager-dark");
+  if (dark) {
+    return {
+      text: "#c9d8ea",
+      grid: "rgba(143,172,204,0.2)",
+      surface: "#132a44",
+      tooltipBg: "#0a1828",
+      salesLine: "#60a5fa",
+      salesFill: "rgba(96,165,250,0.18)",
+      invLine: "#34d399",
+      invFill: "rgba(52,211,153,0.18)",
+      pie: ["#60a5fa","#fb923c","#2dd4bf","#a78bfa","#fbbf24","#38bdf8","#f472b6","#94a3b8"]
+    };
+  }
+  return {
+    text: "#475569",
+    grid: "rgba(148,163,184,0.25)",
+    surface: "#ffffff",
+    tooltipBg: "#0f172a",
+    salesLine: "#1d4ed8",
+    salesFill: "rgba(29,78,216,0.12)",
+    invLine: "#16a34a",
+    invFill: "rgba(22,163,74,0.12)",
+    pie: ["#1d4ed8","#ea580c","#0d9488","#7c3aed","#ca8a04","#0284c7","#db2777","#64748b"]
+  };
+}
+
+function lineChartOptions(theme) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: { backgroundColor: theme.tooltipBg, titleColor: "#ffffff", bodyColor: "#ffffff", borderColor: theme.grid, borderWidth: 1 }
+    },
+    scales: {
+      x: { ticks: { color: theme.text, maxRotation: 45, autoSkip: true, maxTicksLimit: 8 }, grid: { color: theme.grid } },
+      y: { ticks: { color: theme.text, callback: value => "$" + Number(value).toLocaleString("en-US") }, grid: { color: theme.grid } }
+    }
+  };
+}
+
 function renderCharts(reports, historyReports = reports, historyCounts = inventoryCounts) {
+  const theme = getChartTheme();
   // Filter out null entries to prevent "Cannot read properties of null" errors
   const validReports = reports.filter(r => r != null);
   const labels = validReports.map(r => r.date);
@@ -1278,13 +1339,13 @@ function renderCharts(reports, historyReports = reports, historyCounts = invento
         data: validReports.map((report, index) =>
           validReports.slice(0, index + 1).reduce((total, item) => total + (parseFloat(item.total_sales) || 0), 0)
         ),
-        borderColor: "#1d4ed8",
-        backgroundColor: "rgba(29,78,216,0.1)",
+        borderColor: theme.salesLine,
+        backgroundColor: theme.salesFill,
         tension: 0.3,
         fill: true
       }]
     },
-    options: { responsive: true, plugins: { legend: { display: false } } }
+    options: lineChartOptions(theme)
   });
 
   inventoryLineChart = new Chart(document.getElementById("inventoryLineChart"), {
@@ -1294,13 +1355,13 @@ function renderCharts(reports, historyReports = reports, historyCounts = invento
       datasets: [{
         label: "Current Inventory ($)",
         data: validReports.map(r => calculateInventoryEstimate(r.date, historyReports, historyCounts)),
-        borderColor: "#16a34a",
-        backgroundColor: "rgba(22,163,74,0.1)",
+        borderColor: theme.invLine,
+        backgroundColor: theme.invFill,
         tension: 0.3,
         fill: true
       }]
     },
-    options: { responsive: true, plugins: { legend: { display: false } } }
+    options: lineChartOptions(theme)
   });
 
   const vendorChartConfig = {
@@ -1309,7 +1370,9 @@ function renderCharts(reports, historyReports = reports, historyCounts = invento
       labels: vendorLabels,
       datasets: [{
         data: vendorData,
-        backgroundColor: ["#1d4ed8","#16a34a","#dc2626","#ca8a04","#9333ea","#0891b2","#ea580c","#4b5563"]
+        backgroundColor: theme.pie,
+        borderColor: theme.surface,
+        borderWidth: 2
       }]
     },
     options: {
@@ -1320,6 +1383,9 @@ function renderCharts(reports, historyReports = reports, historyCounts = invento
         // second wrapped legend can squeeze the doughnut into an ellipse.
         legend: { display: false },
         tooltip: {
+          backgroundColor: theme.tooltipBg,
+          titleColor: "#ffffff",
+          bodyColor: "#ffffff",
           callbacks: {
             label(context) {
               const amount = Number(context.parsed) || 0;
@@ -1368,8 +1434,8 @@ function renderTable(reports) {
       ${r.id ? `
             <td class="py-2 pr-4">
               <div class="flex gap-1">
-                <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded text-xs" onclick="cameFromManager=true; editReport('${r.id}', '${r.date}')">Edit</button>
-                <button class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-1 px-3 rounded text-xs" onclick="deleteReport('${r.id}', '${r.date}')">Delete</button>
+                <button class="action-btn action-btn-edit" onclick="cameFromManager=true; editReport('${r.id}', '${r.date}')">Edit</button>
+                <button class="action-btn action-btn-delete" onclick="deleteReport('${r.id}', '${r.date}')">Delete</button>
               </div>
             </td>
           ` : ""}
@@ -1444,7 +1510,7 @@ function renderCalendar() {
       const clickHandler = reportId
         ? `cameFromManager=true; editReport('${reportId}', '${dateStr}')`
         : `switchToEmployeeDate('${dateStr}')`;
-      daysHtml += `<button type="button" class="calendar-day ${dateIsSelected ? "calendar-day-selected" : "calendar-day-outside"} ${hasData ? "calendar-day-has-data" : ""}" onclick="${clickHandler}" ${dateIsSelected ? "" : "disabled"}><span>${day}</span><strong>${hasData ? `$${monthSales[dateStr].toFixed(0)}` : "—"}</strong></button>`;
+      daysHtml += `<button type="button" class="calendar-day ${dateIsSelected ? "calendar-day-selected" : "calendar-day-outside"} ${hasData ? "calendar-day-has-data" : ""}" onclick="${clickHandler}" ${dateIsSelected ? "" : "disabled"}><span>${day}</span><strong>${hasData ? `$${Math.round(monthSales[dateStr]).toLocaleString("en-US")}` : "—"}</strong></button>`;
     }
     return `<section class="calendar-month"><h4>${monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h4><div class="calendar-grid">${daysHtml}</div></section>`;
   }).join("");
@@ -1489,7 +1555,7 @@ function renderEmployeeCalendar() {
     const clickHandler = reportId
       ? `cameFromManager=true; editReport('${reportId}', '${dateStr}')`
       : `switchToEmployeeDate('${dateStr}')`;
-    html += `<div class="p-2 rounded text-xs cursor-pointer hover:bg-blue-100 ${hasData ? "bg-blue-50 text-blue-900 font-semibold" : "text-slate-500"}" onclick="${clickHandler}">${d}<div class="text-[10px]">$${sales.toFixed(0)}</div></div>`;
+    html += `<div class="p-2 rounded text-xs cursor-pointer hover:bg-blue-100 ${hasData ? "bg-blue-50 text-blue-900 font-semibold" : "text-slate-500"}" onclick="${clickHandler}">${d}<div class="text-[10px]">$${Math.round(sales).toLocaleString("en-US")}</div></div>`;
   }
   calGrid.innerHTML = html;
 }
@@ -1542,14 +1608,14 @@ function renderVendorList(elementId = "vendorList") {
   const sortedVendors = Object.entries(vendorTotals).sort((a, b) => b[1] - a[1]);
   
   if (sortedVendors.length === 0) {
-    vendorListEl.innerHTML = '<div class="p-4 text-slate-400 text-sm text-center">No purchases in this period</div>';
+    vendorListEl.innerHTML = '<div class="vendor-list-empty">No purchases in this period</div>';
     return;
   }
   
   vendorListEl.innerHTML = sortedVendors.map(([vendor, amount]) => `
-    <div class="flex justify-between items-center p-2 border-b border-slate-100 text-sm">
-      <span class="font-medium text-slate-800">${escapeHTML(vendor)}</span>
-      <span class="font-bold text-slate-900">$${amount.toFixed(2)}</span>
+    <div class="vendor-list-row">
+      <span class="vendor-list-name">${escapeHTML(vendor)}</span>
+      <span class="vendor-list-amount">$${amount.toFixed(2)}</span>
     </div>
   `).join('');
 }
@@ -1573,23 +1639,42 @@ function monthRange(date) {
   return { start: toISODate(first), end: toISODate(last) };
 }
 
-/* Comparison period for the % change figures: the previous calendar month when the
-   range is a full month, otherwise the same number of days immediately before it. */
-function getComparisonRange(start, end) {
+/* Comparison period for the % change figures.
+   - Past full month: the entire previous calendar month.
+   - Current month (month-to-date): the 1st through the last date with entered data,
+     compared with the same day numbers of the previous month.
+   - Custom range: the same number of days immediately before it.
+   Returns null when there is nothing to compare yet (current month with no entries). */
+function getComparisonRange(start, end, reports = []) {
   const s = parseISODate(start);
   const e = parseISODate(end);
+  const sameMonth = e.getFullYear() === s.getFullYear() && e.getMonth() === s.getMonth();
   const lastDayOfStartMonth = new Date(s.getFullYear(), s.getMonth() + 1, 0).getDate();
-  const isFullMonth =
-    s.getDate() === 1 &&
-    e.getFullYear() === s.getFullYear() &&
-    e.getMonth() === s.getMonth() &&
-    e.getDate() === lastDayOfStartMonth;
+  const isWholeMonth = s.getDate() === 1 && sameMonth && e.getDate() === lastDayOfStartMonth;
+  const today = new Date();
+  const isCurrentMonth = s.getFullYear() === today.getFullYear() && s.getMonth() === today.getMonth();
+  const prevMonthDays = new Date(s.getFullYear(), s.getMonth(), 0).getDate();
 
-  if (isFullMonth) {
+  if (isWholeMonth && !isCurrentMonth) {
     return {
       start: toISODate(new Date(s.getFullYear(), s.getMonth() - 1, 1)),
       end: toISODate(new Date(s.getFullYear(), s.getMonth(), 0)),
       label: "vs last month"
+    };
+  }
+
+  if (s.getDate() === 1 && sameMonth) {
+    const enteredDates = reports
+      .filter(r => r != null && r.date >= start && r.date <= end)
+      .map(r => r.date);
+    if (!enteredDates.length) return null;
+    const lastEntered = enteredDates.reduce((max, d) => (d > max ? d : max));
+    const lastDay = parseISODate(lastEntered).getDate();
+    const prevEndDay = Math.min(lastDay, prevMonthDays);
+    return {
+      start: toISODate(new Date(s.getFullYear(), s.getMonth() - 1, 1)),
+      end: toISODate(new Date(s.getFullYear(), s.getMonth() - 1, prevEndDay)),
+      label: "vs same days last month"
     };
   }
 
@@ -1604,9 +1689,9 @@ function getComparisonRange(start, end) {
 function highlightPeriodButtons(mode) {
   document.querySelectorAll(".period-btn").forEach(btn => {
     const active = btn.dataset.period === mode;
-    btn.classList.toggle("bg-indigo-600", active);
+    btn.classList.toggle("bg-blue-700", active);
     btn.classList.toggle("text-white", active);
-    btn.classList.toggle("border-indigo-600", active);
+    btn.classList.toggle("border-blue-700", active);
     btn.classList.toggle("bg-white", !active);
     btn.classList.toggle("text-slate-700", !active);
     btn.classList.toggle("border-slate-300", !active);
@@ -1792,13 +1877,13 @@ async function loadVendorsForView() {
 
     tbody.innerHTML = data.map(v => `
       <tr class="border-b border-slate-100" data-vendor-id="${v.id}">
-        <td class="py-2 pr-4 vendor-name-cell">${v.name || ''}</td>
-        <td class="py-2 pr-4 vendor-rep-cell">${v.representative || '—'}</td>
-        <td class="py-2 pr-4 vendor-phone-cell">${v.phone || '—'}</td>
-        <td class="py-2 pr-4">
+        <td class="py-2 pr-4 vendor-name-cell" data-label="Vendor Name">${v.name || ''}</td>
+        <td class="py-2 pr-4 vendor-rep-cell" data-label="Representative">${v.representative || '—'}</td>
+        <td class="py-2 pr-4 vendor-phone-cell" data-label="Phone">${v.phone || '—'}</td>
+        <td class="py-2 pr-4 vendor-actions-cell" data-label="Actions">
           <div class="flex gap-1">
-            <button type="button" onclick="startEditVendor('${v.id}')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded text-xs">Edit</button>
-            <button type="button" onclick="deleteVendorInline('${v.id}', '${(v.name || '').replace(/'/g, "\\'")}')" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-1 px-3 rounded text-xs">Delete</button>
+            <button type="button" onclick="startEditVendor('${v.id}')" class="action-btn action-btn-edit">Edit</button>
+            <button type="button" onclick="deleteVendorInline('${v.id}', '${(v.name || '').replace(/'/g, "\\'")}')" class="action-btn action-btn-delete">Delete</button>
           </div>
         </td>
       </tr>
@@ -1817,20 +1902,21 @@ function startEditVendor(vendorId) {
   const rep = row.querySelector('.vendor-rep-cell').textContent;
   const phone = row.querySelector('.vendor-phone-cell').textContent;
 
+  row.classList.add("vendor-row-editing");
   row.innerHTML = `
-    <td class="py-2 pr-4">
-      <input type="text" id="editName_${vendorId}" value="${name}" class="field-input w-full text-sm" />
+    <td class="py-2 pr-4" data-label="Vendor Name">
+      <input type="text" id="editName_${vendorId}" aria-label="Vendor name" value="${name}" class="field-input w-full text-sm" autocomplete="organization" />
     </td>
-    <td class="py-2 pr-4">
-      <input type="text" id="editRep_${vendorId}" value="${rep === '—' ? '' : rep}" class="field-input w-full text-sm" />
+    <td class="py-2 pr-4" data-label="Representative">
+      <input type="text" id="editRep_${vendorId}" aria-label="Representative" value="${rep === '—' ? '' : rep}" class="field-input w-full text-sm" autocomplete="name" />
     </td>
-    <td class="py-2 pr-4">
-      <input type="text" id="editPhone_${vendorId}" value="${phone === '—' ? '' : phone}" class="field-input w-full text-sm" />
+    <td class="py-2 pr-4" data-label="Phone">
+      <input type="tel" inputmode="tel" id="editPhone_${vendorId}" aria-label="Phone number" value="${phone === '—' ? '' : phone}" class="field-input w-full text-sm vendor-phone-input" autocomplete="tel" placeholder="e.g. 555-1234" />
     </td>
-    <td class="py-2 pr-4">
-      <div class="flex gap-1">
-        <button type="button" onclick="saveVendorEdit('${vendorId}')" class="bg-blue-700 hover:bg-blue-800 text-white font-bold py-1 px-3 rounded text-xs">Save</button>
-        <button type="button" onclick="cancelVendorEdit('${vendorId}')" class="bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold py-1 px-3 rounded text-xs">Cancel</button>
+    <td class="py-2 pr-4 vendor-actions-cell" data-label="Actions">
+      <div class="vendor-edit-actions">
+        <button type="button" onclick="saveVendorEdit('${vendorId}')" class="action-btn action-btn-save">Save</button>
+        <button type="button" onclick="cancelVendorEdit('${vendorId}')" class="action-btn action-btn-cancel">Cancel</button>
       </div>
     </td>
   `;

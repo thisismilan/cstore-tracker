@@ -1,4 +1,19 @@
+  /* ---- Design tokens: one accent, one type scale, one spacing scale, two radii ---- */
   :root {
+    --accent: #1d4ed8;
+    --accent-hover: #1e40af;
+    --accent-soft: #eff6ff;
+    --accent-border: #bfdbfe;
+    --radius-card: 12px;
+    --radius-control: 8px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --fs-page-title: 1.6rem;
+    --fs-section-title: 1.05rem;
+    --fs-label: 0.75rem;
+    --fs-body: 0.9rem;
     --primary: #1d4ed8;
     --primary-hover: #1e40af;
     --success: #1d4ed8;
@@ -8,9 +23,13 @@
     --bg: #f1f5f9;
     --text: #1e293b;
     --text-muted: #64748b;
+    --surface-2: #f8fafc;
     --border: #e2e8f0;
   }
-  body { font-family: 'Segoe UI', Arial, sans-serif; }
+  body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; }
+  /* Money and counts line up in columns across every table, card and list. */
+  #managerView .stat-value, #managerView .vendor-list-amount, #managerView .calendar-day strong,
+  #managerView table td, #managerView .analytics-summary, #managerView .stat-change { font-variant-numeric: tabular-nums; }
   .card { background:var(--surface); border:1px solid var(--border); border-radius:0.75rem; box-shadow:0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04); }
   .section-title { background:#0f172a; color:#fff; padding:0.5rem 1rem; border-radius:0.375rem 0.375rem 0 0; font-weight:600; letter-spacing:0.02em; }
   input[type="text"], input[type="number"], input[type="date"], textarea, select {
@@ -172,38 +191,21 @@
     overflow:hidden;
   }
   #managerView .stat-card .stat-top { display:flex; align-items:center; gap:0.65rem; }
+  /* One neutral icon tile for every stat card; the icon uses the single accent color. */
   #managerView .stat-card .stat-icon {
     width:38px; height:38px;
     flex:0 0 38px;
-    border-radius:0.6rem;
+    border-radius:var(--radius-control);
     display:grid; place-items:center;
-    color:#1e40af;
-    background:#eff6ff;
-    border:1px solid #bfdbfe;
+    color:var(--accent);
+    background:var(--accent-soft);
+    border:1px solid var(--accent-border);
     font-size:1.05rem;
     transition:transform .15s ease;
   }
   #managerView .stat-card { transition:border-color .15s ease; }
   #managerView .stat-card:hover { border-color:#94a3b8; }
   #managerView .stat-card:hover .stat-icon { transform:scale(1.06); }
-  #managerView .analytics-summary > .stat-card:nth-child(1) .stat-icon {
-    color:#1e40af !important; background:#eff6ff !important; border-color:#bfdbfe;
-  }
-  #managerView .analytics-summary > .stat-card:nth-child(2) .stat-icon {
-    color:#b45309 !important; background:#fffbeb !important; border-color:#fde68a;
-  }
-  #managerView .analytics-summary > .stat-card:nth-child(3) .stat-icon {
-    color:#4338ca !important; background:#eef2ff !important; border-color:#c7d2fe;
-  }
-  #managerView .analytics-summary > .stat-card:nth-child(4) .stat-icon {
-    color:#047857 !important; background:#ecfdf5 !important; border-color:#a7f3d0;
-  }
-  #managerView .analytics-summary > .stat-card:nth-child(5) .stat-icon {
-    color:#7e22ce !important; background:#faf5ff !important; border-color:#e9d5ff;
-  }
-  #managerView .analytics-summary > .stat-card:nth-child(6) .stat-icon {
-    color:#334155 !important; background:#f1f5f9 !important; border-color:#cbd5e1;
-  }
   #managerView .stat-card .stat-top { justify-content:flex-start !important; }
   #managerView .stat-card > .flex.items-baseline { justify-content:flex-start; flex-wrap:wrap; }
   #managerView .stat-card .stat-value { font-variant-numeric:tabular-nums; }
@@ -291,31 +293,52 @@
   #managerView .vendor-pie-wrap canvas { display:block; width:100% !important; height:100% !important; }
   #managerView .inventory-migration-notice:not(.hidden) { margin-top:.75rem; padding:.65rem .8rem; border:1px solid #f3d28b; border-radius:.5rem; color:#805b13; background:#fffbeb; font-size:.8rem; }
 
-  /* Manager-only dark theme, toggled from the manager navigation bar. */
-  body.manager-dark { --surface:#10243a; --bg:#081525; --text:#e9f2ff; --text-muted:#9ab0c9; --border:#263d56; background:#081525; color:#e9f2ff; }
+  /* Manager-only dark theme, toggled from the manager navigation bar.
+     Palette tuned for contrast: primary text ~15:1, muted text ~7:1 on card surfaces. */
+  body.manager-dark {
+    --surface:#132a44; --surface-2:#0e2236; --bg:#0a1828; --text:#e8f0fa; --text-muted:#a9bcd3; --border:#2b4a6b;
+    background:#0a1828; color:#e8f0fa; color-scheme:dark;
+  }
   body.manager-dark #managerView .manager-section-heading h2,
   body.manager-dark #managerView .stat-card .stat-value,
-  body.manager-dark #managerView .font-semibold,
   body.manager-dark #managerView h3,
-  body.manager-dark #managerView h4 { color:#e9f2ff; }
-  body.manager-dark #managerView .card,
-  body.manager-dark #managerView .calendar-day { color:#e9f2ff; background:#10243a; border-color:#263d56; }
-  body.manager-dark #managerView .manager-period-hint { color:#9ecaff; background:#17395d; border-color:#2c5c8b; }
-  body.manager-dark #managerView .calendar-day-selected,
-  body.manager-dark #managerView .calendar-day-has-data { background:#17395d; border-color:#2b5d8e; color:#e9f2ff; }
-  body.manager-dark #managerView .calendar-day strong { color:#8fc3ff; }
-  body.manager-dark #managerView .calendar-day-outside { opacity:.32; }
+  body.manager-dark #managerView h4,
+  body.manager-dark #managerView .font-semibold { color:var(--text); }
+  body.manager-dark #managerView .manager-section-heading p { color:var(--text-muted); }
+  body.manager-dark #managerView .card { color:var(--text); background:var(--surface); border-color:var(--border); box-shadow:0 8px 24px rgba(0,0,0,.28); }
+  body.manager-dark #managerView .manager-period-hint { color:#9ecaff; background:#173a60; border-color:#2f6192; }
+  body.manager-dark #managerView .calendar-month > h4 { color:var(--text); }
+  body.manager-dark #managerView .calendar-weekday { color:var(--text-muted); }
+  body.manager-dark #managerView .calendar-day { color:var(--text-muted); background:var(--surface-2); border-color:var(--border); }
+  body.manager-dark #managerView button.calendar-day:not(:disabled):hover { background:#1a3852; border-color:#4a7fb0; }
+  body.manager-dark #managerView .calendar-day-selected { background:#173553; border-color:#2f5a86; color:var(--text); }
+  body.manager-dark #managerView .calendar-day-has-data { background:#1d4f86; border-color:#3f7cc0; color:#ffffff; }
+  body.manager-dark #managerView .calendar-day strong { color:#9fd4ff; }
+  body.manager-dark #managerView .calendar-day-has-data strong { color:#ffffff; }
+  body.manager-dark #managerView .calendar-day-outside { opacity:.4; }
+  body.manager-dark #managerView .calendar-day-empty { background:transparent; border-color:transparent; }
   body.manager-dark #managerView input,
-  body.manager-dark #managerView select { color:#e9f2ff; background:#0b1a2a; border-color:#39516b; }
+  body.manager-dark #managerView select,
+  body.manager-dark #managerView textarea { color:var(--text); background:var(--surface-2); border-color:#3a5b7d; color-scheme:dark; }
+  body.manager-dark #managerView input::placeholder,
+  body.manager-dark #managerView textarea::placeholder { color:#7f97b4; }
+  body.manager-dark #managerView .text-slate-400,
   body.manager-dark #managerView .text-slate-500,
-  body.manager-dark #managerView .text-slate-600,
-  body.manager-dark #managerView .text-slate-700 { color:#a9bbce !important; }
+  body.manager-dark #managerView .text-slate-600 { color:var(--text-muted) !important; }
+  body.manager-dark #managerView .text-slate-700,
+  body.manager-dark #managerView .text-slate-800,
+  body.manager-dark #managerView .text-slate-900 { color:var(--text) !important; }
   body.manager-dark #managerView .border-slate-100,
   body.manager-dark #managerView .border-slate-200,
-  body.manager-dark #managerView .border-slate-300 { border-color:#263d56 !important; }
+  body.manager-dark #managerView .border-slate-300 { border-color:var(--border) !important; }
   body.manager-dark #managerView .bg-white,
-  body.manager-dark #managerView .bg-slate-50 { background:#10243a !important; }
-  body.manager-dark #managerView .hover\:bg-slate-50:hover { background:#18334e !important; }
+  body.manager-dark #managerView .bg-slate-50 { background:var(--surface) !important; }
+  body.manager-dark #managerView .hover\:bg-slate-50:hover,
+  body.manager-dark #managerView .hover\:bg-slate-100:hover { background:#1a3552 !important; }
+  body.manager-dark #managerView .text-blue-700,
+  body.manager-dark #managerView .text-blue-800 { color:#7cb8ff !important; }
+  body.manager-dark #managerView .text-red-600 { color:#f87171 !important; }
+  body.manager-dark #managerView .text-green-600 { color:#4ade80 !important; }
   body.manager-dark #managerView .inventory-migration-notice:not(.hidden) { color:#ffdb8b; background:#382f1d; border-color:#655229; }
 
   @media (max-width: 640px) {
@@ -463,4 +486,96 @@
       padding-left: .75rem;
       padding-right: .75rem;
     }
+  }
+
+  /* ---- Typography scale (manager dashboard) ---- */
+  #managerView .manager-section-heading h2 { font-size:var(--fs-page-title); font-weight:700; }
+  #managerView h3.font-semibold, #managerView .card > h3 { font-size:var(--fs-section-title); font-weight:650; color:var(--text); }
+  #managerView .stat-card .stat-label { font-size:var(--fs-label); font-weight:600; letter-spacing:.06em; }
+  #managerView .stat-card .stat-value { font-size:1.25rem; font-weight:700; }
+  #managerView .manager-section-heading p, #managerView .stat-card .stat-sub { font-size:var(--fs-body); }
+
+  /* ---- Row action buttons (Edit / Delete): softer, low-glare colors in both themes ---- */
+  .action-btn {
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:3.5rem; padding:.3rem .75rem; border-radius:var(--radius-control);
+    font-size:.75rem; font-weight:600; letter-spacing:.01em; line-height:1.2;
+    border:1px solid transparent; cursor:pointer;
+    transition:background-color .15s ease, border-color .15s ease, color .15s ease;
+  }
+  .action-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  /* Edit: muted blue tint with dark text on light; soft blue text on dark. */
+  .action-btn-edit { color:#1e40af; background:#dbeafe; border-color:#bfdbfe; }
+  .action-btn-edit:hover { background:#bfdbfe; border-color:#93c5fd; }
+  /* Delete: muted rose tint instead of a saturated red fill. */
+  .action-btn-delete { color:#9f1239; background:#ffe4e6; border-color:#fecdd3; }
+  .action-btn-delete:hover { background:#fecdd3; border-color:#fda4af; }
+  body.manager-dark .action-btn-edit { color:#bfdbfe; background:rgba(59,130,246,.16); border-color:rgba(96,165,250,.35); }
+  body.manager-dark .action-btn-edit:hover { background:rgba(59,130,246,.26); border-color:rgba(96,165,250,.55); }
+  body.manager-dark .action-btn-delete { color:#fecaca; background:rgba(244,63,94,.14); border-color:rgba(251,113,133,.35); }
+  body.manager-dark .action-btn-delete:hover { background:rgba(244,63,94,.24); border-color:rgba(251,113,133,.55); }
+  .action-btn-save { color:#fff; background:#1d4ed8; border-color:#1d4ed8; }
+  .action-btn-save:hover { background:#1e40af; border-color:#1e40af; }
+  .action-btn-cancel { color:var(--text); background:var(--surface-2); border-color:var(--border); }
+  .action-btn-cancel:hover { background:var(--border); }
+  @media (max-width: 640px) { .action-btn { min-height:40px; } }
+
+  /* ---- Vendor list: inline editing that works on phones ----
+     Desktop keeps the table. On narrow screens each row becomes a stacked card with
+     labelled, full-width fields and full-width Save / Cancel buttons. */
+  #vendorView .vendor-edit-actions { display:flex; gap:.5rem; }
+  #vendorView .vendor-edit-actions .action-btn { flex:1 1 0; }
+  @media (max-width: 640px) {
+    #vendorView .card table thead { display:none; }
+    #vendorView .card table, #vendorView .card tbody, #vendorView .card tr, #vendorView .card td { display:block; width:100%; }
+    #vendorView .card tbody tr {
+      border:1px solid var(--border); border-radius:var(--radius-card);
+      padding:var(--space-3); margin-bottom:var(--space-3); background:var(--surface);
+    }
+    #vendorView .card tbody tr td { padding:.35rem 0 !important; border:0 !important; }
+    #vendorView .card tbody tr td[data-label]::before {
+      content:attr(data-label); display:block; margin-bottom:.25rem;
+      font-size:var(--fs-label); font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+      color:var(--text-muted);
+    }
+    #vendorView .card tbody tr td .field-input { min-height:44px; font-size:16px; padding:.6rem .75rem; }
+    #vendorView .card tbody tr td.vendor-actions-cell .flex { display:flex; gap:var(--space-2); }
+    #vendorView .card tbody tr td.vendor-actions-cell .flex > .action-btn { flex:1 1 0; min-height:44px; }
+    #vendorView .vendor-edit-actions { flex-direction:column; }
+    #vendorView .vendor-edit-actions .action-btn { min-height:44px; width:100%; }
+    #vendorView .vendor-row-editing td[data-label="Phone"] .field-input { min-height:44px; }
+    #vendorView .card tbody tr td.vendor-actions-cell { padding-top:.6rem !important; }
+  }
+
+  /* ---- Segmented period control with Export aligned right ---- */
+  .period-segment { border:1px solid var(--border); border-radius:var(--radius-control); overflow:hidden; background:var(--surface); }
+  .period-segment .period-btn { border:0 !important; border-radius:0 !important; }
+  .period-segment .period-btn + .period-btn { border-left:1px solid var(--border) !important; }
+  #managerView .analytics-controls { padding:var(--space-4); gap:var(--space-3); }
+
+  /* ---- Change indicators: sales uses green/red, purchases and inventory stay neutral ---- */
+  #managerView .stat-change.stat-change-neutral { color:var(--text-muted) !important; }
+
+  /* ---- Spacing and radii: cards use the card radius, controls use the control radius ---- */
+  #managerView .card { border-radius:var(--radius-card); }
+  #managerView .card.p-4 { padding:var(--space-4); }
+  #managerView .calendar-day, #managerView .period-btn, #managerView .vendor-list-box { border-radius:var(--radius-control); }
+
+  /* ---- Manager dashboard: chart sizing, vendor list, mobile layout ---- */
+  #managerView .chart-box { position:relative; width:100%; height:16rem; min-width:0; }
+  #managerView .vendor-list-box { max-height:16rem; overflow-y:auto; background:var(--surface-2); border:1px solid var(--border); border-radius:.5rem; }
+  #managerView .vendor-list-row { display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.6rem .85rem; border-bottom:1px solid var(--border); font-size:.875rem; }
+  #managerView .vendor-list-row:last-child { border-bottom:0; }
+  #managerView .vendor-list-name { color:var(--text); font-weight:600; min-width:0; overflow-wrap:anywhere; }
+  #managerView .vendor-list-amount { color:var(--text); font-weight:700; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  #managerView .vendor-list-empty { padding:1rem; text-align:center; color:var(--text-muted); font-size:.875rem; }
+
+  @media (max-width: 640px) {
+    #managerView .chart-box { height:13.5rem; }
+    #managerView .analytics-controls > div:first-child { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; gap:.5rem; }
+    #managerView .analytics-controls > div:first-child .period-btn { min-height:44px; padding-left:.5rem; padding-right:.5rem; }
+    #managerView .analytics-controls #customRange { width:100%; flex-wrap:wrap; }
+    #managerView .analytics-controls #customRange > div { flex:1 1 9rem; }
+    #managerView .analytics-controls #exportExcelBtn { width:100%; }
+    #managerView .vendor-list-row { padding:.55rem .7rem; }
   }
