@@ -74,6 +74,25 @@
   </div>
 </div>
 
+<!-- ============ MANAGER NAVIGATION ============ -->
+<div id="managerTopbarShell" class="manager-topbar-shell hidden">
+  <div class="manager-topbar">
+    <div class="manager-topbar-brand"><span class="manager-brand-icon">🏪</span><span>C-Store Sales Tracker<small>Manager workspace</small></span></div>
+    <nav class="manager-tabs" aria-label="Manager dashboard sections" role="tablist">
+      <button type="button" class="manager-tab active" data-manager-tab="overview" role="tab" aria-selected="true">Overview</button>
+      <button type="button" class="manager-tab" data-manager-tab="vendors" role="tab" aria-selected="false">Vendors</button>
+      <button type="button" class="manager-tab" data-manager-tab="inventory" role="tab" aria-selected="false">Inventory</button>
+      <button type="button" class="manager-tab" data-manager-tab="reports" role="tab" aria-selected="false">Daily Reports</button>
+      <button type="button" class="manager-tab" data-manager-tab="lottery" role="tab" aria-selected="false">Lottery</button>
+    </nav>
+    <div class="manager-topbar-actions">
+      <span id="managerNavUserInfo" class="manager-nav-user">Signed in as Manager</span>
+      <button type="button" id="managerThemeToggle" class="manager-icon-button" aria-label="Switch to dark mode" title="Switch light/dark mode">◐</button>
+      <button type="button" id="managerLogoutBtn" class="manager-logout-button">Logout</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ EMPLOYEE VIEW ============ -->
 <div id="employeeView" class="hidden max-w-5xl mx-auto px-4 py-6 space-y-6">
   <header class="report-heading report-topline">
@@ -314,25 +333,6 @@
 
 </div>
 
-<!-- ============ MANAGER NAVIGATION ============ -->
-<div id="managerTopbarShell" class="manager-topbar-shell hidden">
-  <div class="manager-topbar">
-    <div class="manager-topbar-brand"><span class="manager-brand-icon">🏪</span><span>C-Store Sales Tracker<small>Manager workspace</small></span></div>
-    <nav class="manager-tabs" aria-label="Manager dashboard sections" role="tablist">
-      <button type="button" class="manager-tab active" data-manager-tab="overview" role="tab" aria-selected="true">Overview</button>
-      <button type="button" class="manager-tab" data-manager-tab="vendors" role="tab" aria-selected="false">Vendors</button>
-      <button type="button" class="manager-tab" data-manager-tab="inventory" role="tab" aria-selected="false">Inventory</button>
-      <button type="button" class="manager-tab" data-manager-tab="reports" role="tab" aria-selected="false">Daily Reports</button>
-      <button type="button" class="manager-tab" data-manager-tab="lottery" role="tab" aria-selected="false">Lottery</button>
-    </nav>
-    <div class="manager-topbar-actions">
-      <span id="managerNavUserInfo" class="manager-nav-user">Signed in as Manager</span>
-      <button type="button" id="managerThemeToggle" class="manager-icon-button" aria-label="Switch to dark mode" title="Switch light/dark mode">◐</button>
-      <button type="button" id="managerLogoutBtn" class="manager-logout-button">Logout</button>
-    </div>
-  </div>
-</div>
-
 <!-- ============ MANAGER VIEW ============ -->
 <div id="managerView" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
 
@@ -489,6 +489,57 @@
 
   <div class="manager-tab-panel" id="managerTab-reports" role="tabpanel" hidden>
   <div class="manager-section-heading"><div><h2>Daily Reports</h2><p>Review, edit or delete reports in the selected date range.</p></div><span id="reportsPeriodHeading" class="manager-period-hint"></span></div>
+  <!-- Daily Reports overview cards -->
+  <div class="analytics-summary overview-summary">
+    <div class="card p-4 text-center stat-card">
+      <div class="stat-top" style="justify-content:center;">
+        <div class="stat-icon">
+          <i class="fa-solid fa-cash-register"></i>
+        </div>
+        <div class="stat-label">Total Sales</div>
+      </div>
+      <div class="flex items-baseline justify-center gap-2">
+        <div id="rptSumTotalSales" class="stat-value">$0.00</div>
+        <div id="rptSumTotalSalesChange" class="stat-change text-sm font-bold"></div>
+      </div>
+    </div>
+    <div class="card p-4 text-center stat-card">
+      <div class="stat-top" style="justify-content:center;">
+        <div class="stat-icon">
+          <i class="fa-solid fa-truck-fast"></i>
+        </div>
+        <div class="stat-label">Total Purchases</div>
+      </div>
+      <div class="flex items-baseline justify-center gap-2">
+        <div id="rptSumPurchases" class="stat-value">$0.00</div>
+        <div id="rptSumPurchasesChange" class="stat-change text-sm font-bold"></div>
+      </div>
+    </div>
+    <div class="card p-4 text-center stat-card">
+      <div class="stat-top" style="justify-content:center;">
+        <div class="stat-icon">
+          <i class="fa-solid fa-money-bill-trend-up"></i>
+        </div>
+        <div class="stat-label">Avg Daily Sales</div>
+      </div>
+      <div class="flex items-baseline justify-center gap-2">
+        <div id="rptSumAvgSales" class="stat-value">$0.00</div>
+        <div id="rptSumAvgSalesChange" class="stat-change text-sm font-bold"></div>
+      </div>
+    </div>
+    <div class="card p-4 text-center stat-card">
+      <div class="stat-top" style="justify-content:center;">
+        <div class="stat-icon">
+          <i class="fa-solid fa-scale-balanced"></i>
+        </div>
+        <div class="stat-label">Total Short/Over</div>
+      </div>
+      <div class="flex items-baseline justify-center gap-2">
+        <div id="rptSumOverShort" class="stat-value">$0.00</div>
+        <div id="rptSumOverShortChange" class="stat-change text-sm font-bold"></div>
+      </div>
+    </div>
+  </div>
   <div class="card p-4 overflow-x-auto">
     <div class="flex items-center justify-between mb-3">
       <h3 class="font-semibold text-slate-700">Daily Reports</h3>
@@ -517,6 +568,7 @@
       <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-ticket"></i></div><div class="stat-label">Lottery Sales</div></div><div id="lotteryTotalSales" class="stat-value">$0.00</div><div class="text-xs text-slate-500">Lottery actual sales</div></div>
       <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-ticket-simple"></i></div><div class="stat-label">Lotto Sales</div></div><div id="lottoTotalSales" class="stat-value">$0.00</div><div class="text-xs text-slate-500">Lotto actual sales</div></div>
       <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-cash-register"></i></div><div class="stat-label">Lottery + Lotto Sales</div></div><div id="lotteryOverallSales" class="stat-value">$0.00</div></div>
+      <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-calculator"></i></div><div class="stat-label">Avg Lottery + Lotto Sales</div></div><div id="lotteryAvgSales" class="stat-value">$0.00</div><div class="text-xs text-slate-500">Average per daily report</div></div>
       <div class="card p-4 text-center stat-card"><div class="stat-top"><div class="stat-icon"><i class="fa-solid fa-money-bill-transfer"></i></div><div class="stat-label">Total Payout</div></div><div id="lotteryPayoutTotal" class="stat-value">$0.00</div><div class="text-xs text-slate-500">Lottery payout only</div></div>
     </div>
   </div>

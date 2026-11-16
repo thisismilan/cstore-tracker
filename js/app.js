@@ -203,19 +203,22 @@ async function checkAndLoadEntryForDate(dateStr) {
   if (session.role !== "employee" && session.role !== "manager") return;
   
   try {
+    // Use an array query instead of .single() so that a date with duplicate
+    // rows still loads its report instead of being treated as empty.
     const { data, error } = await supabaseClient
       .from(TABLE_NAME)
       .select("*")
       .eq("date", dateStr)
-      .single();
+      .order("id", { ascending: true })
+      .limit(1);
     
-    if (error && error.code !== "PGRST116") {
+    if (error) {
       console.error("Error checking entry:", error);
       return;
     }
     
-    if (data) {
-      loadEntryForEdit(data);
+    if (data && data.length > 0) {
+      loadEntryForEdit(data[0]);
     } else {
       clearEditState();
     }
@@ -638,6 +641,33 @@ document.getElementById("dailyReportForm").addEventListener("submit", async (e) 
     shift_notes: document.getElementById("shiftNotes").value.trim()
   };
 
+  // Prevent duplicate reports: only one daily report is allowed per date.
+  if (!currentEditingId) {
+    const { data: existingRows, error: existingError } = await supabaseClient
+      .from(TABLE_NAME)
+      .select("*")
+      .eq("date", payload.date)
+      .order("id", { ascending: true })
+      .limit(1);
+
+    if (existingError) {
+      showToast("Could not check for an existing report: " + existingError.message, "error");
+      return;
+    }
+
+    if (existingRows && existingRows.length > 0) {
+      const wantsToEdit = confirm("Report already exists, want to edit? Click OK for Yes or Cancel for No.");
+      if (wantsToEdit) {
+        loadEntryForEdit(existingRows[0]);
+        showToast("Existing report loaded for editing. Review the changes and submit again.", "success");
+      } else {
+        showToast("Report was not saved. A report already exists for this date.", "error");
+      }
+      return;
+    }
+  }
+
+
   const submitBtn = e.target.querySelector("button[type=submit]");
   submitBtn.disabled = true;
   submitBtn.textContent = "Submitting...";
@@ -663,7 +693,12 @@ document.getElementById("dailyReportForm").addEventListener("submit", async (e) 
   
   if (result.error) {
     console.error(result.error);
-    showToast("Error saving report: " + result.error.message, "error");
+    if (result.error.code === "23505") {
+      showToast("Report already exists for this date. Edit the existing report instead.", "error");
+      checkAndLoadEntryForDate(payload.date);
+    } else {
+      showToast("Error saving report: " + result.error.message, "error");
+    }
   } else {
     if (currentEditingId) {
       showToast("Daily report updated successfully!");
@@ -1002,6 +1037,7 @@ async function loadDashboardData() {
   calMonth = startDate.getMonth();
 
   renderSummary(currentReports, prevData, compare ? compare.label : "");
+  renderReportsOverview(currentReports, prevData, compare ? compare.label : "");
   renderCharts(currentReports, inventoryHistoryReports, inventoryHistoryCounts);
   renderTable(currentReports);
   renderCalendar();
@@ -1127,6 +1163,60 @@ function renderSummary(reports, prevReports, compareLabel) {
   document.getElementById("sumCurrentInventory").textContent = "$" + currentInventory.toFixed(2);
 }
 
+/* ---- Daily Reports tab overview cards (same period and comparison as the Overview tab) ---- */
+function renderReportsOverview(reports, prevReports, compareLabel) {
+  const validReports = reports.filter(r => r != null);
+  const validPrev = prevReports.filter(r => r != null);
+
+  const totalSalesOf = list => list.reduce((s, r) => s + (parseFloat(r.total_sales) || 0), 0);
+  const totalPurchasesOf = list => list.reduce((s, r) => s + (parseFloat(r.purchases_total) || 0), 0);
+  const overShortOf = list => list.reduce((s, r) => s + (parseFloat(r.over_short) || 0), 0);
+  const avgSalesOf = list => (list.length ? totalSalesOf(list) / list.length : 0);
+
+  const totalSales = totalSalesOf(validReports);
+  const totalPurchases = totalPurchasesOf(validReports);
+  const avgSales = avgSalesOf(validReports);
+  const overShort = overShortOf(validReports);
+
+  // Percent change against the comparison period. Short/Over can be negative, so its
+  // percent is measured against the absolute value of the previous period's total.
+  const pct = (cur, prev) => {
+    if (!prev) return null;
+    return ((cur - prev) / Math.abs(prev)) * 100;
+  };
+
+  const showChanges = {
+    rptSumTotalSalesChange: { cur: totalSales, prev: totalSalesOf(validPrev), neutral: false },
+    rptSumPurchasesChange: { cur: totalPurchases, prev: totalPurchasesOf(validPrev), neutral: true },
+    rptSumAvgSalesChange: { cur: avgSales, prev: avgSalesOf(validPrev), neutral: false },
+    rptSumOverShortChange: { cur: overShort, prev: overShortOf(validPrev), neutral: false }
+  };
+
+  Object.entries(showChanges).forEach(([id, vals]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const p = pct(vals.cur, vals.prev);
+    if (p === null) {
+      el.textContent = "";
+      el.classList.remove("text-green-600", "text-red-600", "stat-change-neutral");
+      return;
+    }
+    // Arrow shows direction without relying on color. Purchases are neutral:
+    // a drop in purchases isn't necessarily bad, so it is not colored green/red.
+    const arrow = p >= 0 ? "▲" : "▼";
+    el.textContent = ` ${arrow} ${Math.abs(p).toFixed(0)}% ${compareLabel}`;
+    el.classList.toggle("text-green-600", !vals.neutral && p >= 0);
+    el.classList.toggle("text-red-600", !vals.neutral && p < 0);
+    el.classList.toggle("stat-change-neutral", !!vals.neutral);
+  });
+
+  const money = value => (value < 0 ? "-$" : "$") + Math.abs(value).toFixed(2);
+  document.getElementById("rptSumTotalSales").textContent = money(totalSales);
+  document.getElementById("rptSumPurchases").textContent = money(totalPurchases);
+  document.getElementById("rptSumAvgSales").textContent = money(avgSales);
+  document.getElementById("rptSumOverShort").textContent = money(overShort);
+}
+
 function renderVendorMetrics(reports) {
   const validReports = reports.filter(report => report != null);
   const totalSales = validReports.reduce((sum, report) => sum + (parseFloat(report.total_sales) || 0), 0);
@@ -1144,6 +1234,8 @@ function renderLotteryMetrics(reports) {
   document.getElementById("lottoTotalSales").textContent = `$${sum("lotto_actual").toFixed(2)}`;
   const combinedLotterySales = sum("lottery_actual") + sum("lotto_actual");
   document.getElementById("lotteryOverallSales").textContent = `$${combinedLotterySales.toFixed(2)}`;
+  const avgLotterySales = validReports.length ? combinedLotterySales / validReports.length : 0;
+  document.getElementById("lotteryAvgSales").textContent = `$${avgLotterySales.toFixed(2)}`;
   document.getElementById("lotteryPayoutTotal").textContent = `$${sum("lottery_payout").toFixed(2)}`;
 }
 
